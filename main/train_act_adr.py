@@ -101,17 +101,19 @@ def train_and_aug(args, demo_files, log_dir, var_adr_light, var_adr_plate, var_a
     print("Action shape: {}".format(len(Prepared_Data['bc_train_set'].dummy_data['action'])))
     print("robot_qpos shape: {}".format(len(Prepared_Data['bc_train_set'].dummy_data['robot_qpos'])))
     
-    if current_rank > 1:
-        # make agent
-        agent = ActAgent(args)
-        agent.load(os.path.join(args['sim_aug_dataset_folder'], f"epoch_best.pt"))
-        epochs = 200  # 100, 200            
-        eval_freq = 50 # 25, 50
-    else:
-        # make agent
-        agent = ActAgent(args)
+     # make agent
+    agent = ActAgent(args)
+    if current_rank == 1:
         epochs = args['num_epochs']
         eval_freq = args['eval_freq']
+    elif current_rank > 1:
+        agent.load(os.path.join(args['sim_aug_dataset_folder'], f"epoch_best.pt"))
+        epochs = 500  # 100, 200            
+        eval_freq = 100 # 25, 50
+    elif is_stop:
+        agent.load(os.path.join(args['sim_aug_dataset_folder'], f"epoch_best.pt"))
+        epochs = 2000  # 100, 200
+        eval_freq = 100 # 25, 50
     
     L = Logger("{}_{}".format(args['model_name'],epochs))
     
@@ -136,7 +138,7 @@ def train_and_aug(args, demo_files, log_dir, var_adr_light, var_adr_plate, var_a
             "var_adr_object": var_adr_object
         }
         
-        if (epoch + 1) % eval_freq == 0 and (current_rank > 1 or (epoch + 1) >= 300):
+        if (epoch + 1) % eval_freq == 0 and ((current_rank > 1 and (epoch + 1) >= 200) or (current_rank == 1 and (epoch + 1) >= 300)):
             ##total_steps = x_steps * y_steps = 4 * 5 = 20
             torch.cuda.empty_cache()
             with torch.inference_mode():
@@ -258,10 +260,11 @@ def main(args):
             is_var_adr = True
 
         if is_stop:
+            ##############Final Train#################
+            torch.cuda.empty_cache()
+            var_adr_light, var_adr_plate, var_adr_object, is_var_adr, current_rank, is_stop = train_and_aug(args, demo_files, log_dir, var_adr_light, var_adr_plate, 
+                                                                                                    var_adr_object, is_var_adr, current_rank, is_stop)
             print('#################################Stop training##############################')
-            for final_it in range(10):
-                var_adr_light, var_adr_plate, var_adr_object, is_var_adr, current_rank, is_stop = train_and_aug(args, demo_files, log_dir, var_adr_light, var_adr_plate, 
-                                                                                                        var_adr_object, is_var_adr, current_rank, is_stop)
             break
     
     wandb.finish()
