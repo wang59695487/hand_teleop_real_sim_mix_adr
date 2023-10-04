@@ -7,7 +7,6 @@ from datetime import datetime
 import numpy as np
 import sapien.core as sapien
 import torch, wandb, copy, h5py, time
-from tqdm import tqdm
 
 import multiprocessing as mp
 
@@ -106,8 +105,8 @@ def train_and_aug(args, demo_files, log_dir, var_adr_light, var_adr_plate, var_a
         # make agent
         agent = ActAgent(args)
         agent.load(os.path.join(args['sim_aug_dataset_folder'], f"epoch_best.pt"))
-        epochs = 100  # 100, 200            
-        eval_freq = 25 # 25, 50
+        epochs = 200  # 100, 200            
+        eval_freq = 50 # 25, 50
     else:
         # make agent
         agent = ActAgent(args)
@@ -181,12 +180,8 @@ def train_and_aug(args, demo_files, log_dir, var_adr_light, var_adr_plate, var_a
         
         wandb.log(metrics)
     
-    ################When var_adr_light = 2, var_adr_plate = 0.05, var_adr_object = 0.1, stop the augment#################
-    if (current_rank == 2 and var_adr_light == 2) or (current_rank == 3 and var_adr_plate == 0.05) or (current_rank == 4 and var_adr_object == 0.1):
-        current_rank += 1
-        is_var_adr = True
     ##################ADR##################
-    elif best_success <= last_best_success - 0.1:
+    if best_success <= last_best_success - 0.1:
         total_episodes = last_total_episodes
         best_success = last_best_success
         ################Cancel the augment in environment domain and continue sample in the original domain#################
@@ -196,6 +191,7 @@ def train_and_aug(args, demo_files, log_dir, var_adr_light, var_adr_plate, var_a
         else:
             current_rank += 1
             is_var_adr = True
+
     ##################Finish ADR##################
     if current_rank == args['randomness_rank']+1:
         is_stop = True
@@ -216,7 +212,7 @@ def train_and_aug(args, demo_files, log_dir, var_adr_light, var_adr_plate, var_a
     
     ##############Update the ADR parameters for different ranks#################
     if current_rank == 2: 
-        var_adr_light = var_adr_light + 0.1 if is_var_adr else var_adr_light
+        var_adr_light = var_adr_light + 0.2 if is_var_adr else var_adr_light
     elif current_rank == 3:
         var_adr_plate = var_adr_plate + 0.01 if is_var_adr else var_adr_plate
     elif current_rank == 4:
@@ -253,6 +249,14 @@ def main(args):
         torch.cuda.empty_cache()
         var_adr_light, var_adr_plate, var_adr_object, is_var_adr, current_rank, is_stop = train_and_aug(args, demo_files, log_dir, var_adr_light, var_adr_plate, 
                                                                                                         var_adr_object, is_var_adr, current_rank, is_stop)
+        ################When var_adr_light = 2, var_adr_plate = 0.05, var_adr_object = 0.1, stop the augment#################
+        if (current_rank == 2 and var_adr_light > 2) or (current_rank == 3 and var_adr_plate > 0.05) or (current_rank == 4 and var_adr_object > 0.1):
+            var_adr_light = 2 if current_rank >= 2 else 1
+            var_adr_plate = 0.05 if current_rank >= 3 else 0.01
+            var_adr_object = 0.1 if current_rank >= 4 else 0.01
+            current_rank += 1
+            is_var_adr = True
+
         if is_stop:
             print('#################################Stop training##############################')
             for final_it in range(10):
