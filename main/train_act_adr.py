@@ -101,15 +101,15 @@ def train_and_aug(args, demo_files, log_dir, var_adr_light, var_adr_plate, var_a
     print("Action shape: {}".format(len(Prepared_Data['bc_train_set'].dummy_data['action'])))
     print("robot_qpos shape: {}".format(len(Prepared_Data['bc_train_set'].dummy_data['robot_qpos'])))
     
-     # make agent
+    # make agent
     agent = ActAgent(args)
     if current_rank == 1:
         epochs = args['num_epochs']
         eval_freq = args['eval_freq']
     elif current_rank > 1:
         agent.load(os.path.join(args['sim_aug_dataset_folder'], f"epoch_best.pt"))
-        epochs = 500  # 100, 200            
-        eval_freq = 100 # 25, 50
+        epochs = 300  # 100, 200            
+        eval_freq = 50 # 25, 50
     elif is_stop:
         agent.load(os.path.join(args['sim_aug_dataset_folder'], f"epoch_best.pt"))
         epochs = 2000  # 100, 200
@@ -138,7 +138,7 @@ def train_and_aug(args, demo_files, log_dir, var_adr_light, var_adr_plate, var_a
             "var_adr_object": var_adr_object
         }
         
-        if (epoch + 1) % eval_freq == 0 and ((current_rank > 1 and (epoch + 1) >= 200) or (current_rank == 1 and (epoch + 1) >= 300)):
+        if (epoch + 1) % eval_freq == 0 and ((current_rank > 1 and (epoch + 1) >= 100) or (current_rank == 1 and (epoch + 1) >= 300)):
             ##total_steps = x_steps * y_steps = 4 * 5 = 20
             torch.cuda.empty_cache()
             with torch.inference_mode():
@@ -177,6 +177,7 @@ def train_and_aug(args, demo_files, log_dir, var_adr_light, var_adr_plate, var_a
                 metrics["avg_success"] = avg_success
                 if avg_success > best_success:
                     best_success = avg_success
+                elif avg_success >= last_best_success:
                     agent.save(os.path.join(args['sim_aug_dataset_folder'], f"epoch_best.pt"), args)
                 metrics["best_success"] = best_success
         
