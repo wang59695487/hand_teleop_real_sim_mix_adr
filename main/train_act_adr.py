@@ -41,6 +41,7 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
                 var_adr_object = all_meta_data['var_adr_object']
                 is_var_adr = all_meta_data['is_var_adr']
                 is_stop = all_meta_data['is_stop']
+                break
             else:
                 last_total_episodes = 0
                 total_episodes = 0
@@ -101,6 +102,7 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
         last_best_success = 0
         sim_aug_demo_length = None
         sim_aug_path = None
+        is_stop = False
 
     Prepared_Data = prepare_sim_aug_data(sim_dataset_folder=args['sim_dataset_folder'],sim_dataset_aug_folder=sim_aug_path, sim_aug_demo_length=sim_aug_demo_length, sim_batch_size=args['sim_batch_size'],
                                  val_ratio=args['val_ratio'], seed = 20230920, chunk_size=args['num_queries'])
@@ -275,8 +277,7 @@ def main(args):
         if is_stop:
             ##############Final Train#################
             torch.cuda.empty_cache()
-            var_adr_light, var_adr_plate, var_adr_object, is_var_adr, current_rank, is_stop = train_and_aug(args, demo_files, log_dir, var_adr_light, var_adr_plate, 
-                                                                                                    var_adr_object, is_var_adr, current_rank, is_stop)
+            current_rank, is_stop = train_and_aug(args, demo_files, log_dir, current_rank)
             print('#################################Stop training##############################')
             break
     
