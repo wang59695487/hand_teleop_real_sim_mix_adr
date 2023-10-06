@@ -21,7 +21,7 @@ from hand_teleop.player.play_multiple_demonstrations_act import stack_and_save_f
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def train_and_aug(args, demo_files, log_dir, var_adr_light, var_adr_plate, var_adr_object, is_var_adr, current_rank, is_stop):
+def train_and_aug(args, demo_files, log_dir, current_rank):
     # read and prepare data
     set_seed(args["seed"])
        
@@ -36,10 +36,20 @@ def train_and_aug(args, demo_files, log_dir, var_adr_light, var_adr_plate, var_a
                 total_episodes = last_total_episodes
                 init_obj_poses = all_meta_data['init_obj_poses']
                 last_best_success = all_meta_data['best_success']
+                var_adr_light = all_meta_data['var_adr_light']
+                var_adr_plate = all_meta_data['var_adr_plate']
+                var_adr_object = all_meta_data['var_adr_object']
+                is_var_adr = all_meta_data['is_var_adr']
+                is_stop = all_meta_data['is_stop']
             else:
                 last_total_episodes = 0
                 total_episodes = 0
                 init_obj_poses = []
+                var_adr_light = 1
+                var_adr_plate = 0.01
+                var_adr_object = 0.01
+                is_var_adr = True
+                is_stop = False
                 meta_data_path = f"{args['sim_dataset_folder']}/meta_data.pickle" 
                 with open(meta_data_path,'rb') as file:
                     all_meta_data = pickle.load(file)
@@ -108,8 +118,8 @@ def train_and_aug(args, demo_files, log_dir, var_adr_light, var_adr_plate, var_a
         eval_freq = args['eval_freq']
     elif current_rank > 1:
         agent.load(os.path.join(args['sim_aug_dataset_folder'], f"epoch_best.pt"))
-        epochs = 300  # 100, 200            
-        eval_freq = 50 # 25, 50
+        epochs = 500  # 100, 200            
+        eval_freq = 100 # 25, 50
     elif is_stop:
         agent.load(os.path.join(args['sim_aug_dataset_folder'], f"epoch_best.pt"))
         epochs = 2000  # 100, 200
@@ -132,10 +142,7 @@ def train_and_aug(args, demo_files, log_dir, var_adr_light, var_adr_plate, var_a
             "loss/train_kl": loss_kl*args['kl_weight'],
             "loss/val": loss_val,
             "epoch": epoch,
-            "current_rank": current_rank,
-            "var_adr_light": var_adr_light,
-            "var_adr_plate": var_adr_plate,
-            "var_adr_object": var_adr_object
+            "current_rank": current_rank
         }
         
         if (epoch + 1) % eval_freq == 0 and ((current_rank > 1 and (epoch + 1) >= 100) or (current_rank == 1 and (epoch + 1) >= 300)):
@@ -177,10 +184,16 @@ def train_and_aug(args, demo_files, log_dir, var_adr_light, var_adr_plate, var_a
                 metrics["avg_success"] = avg_success
                 if avg_success > best_success:
                     best_success = avg_success
-                elif avg_success >= last_best_success:
-                    agent.save(os.path.join(args['sim_aug_dataset_folder'], f"epoch_best.pt"), args)
+                    if best_success > last_best_success:
+                        agent.save(os.path.join(args['sim_aug_dataset_folder'], f"epoch_best.pt"), args)
                 metrics["best_success"] = best_success
-        
+
+        if current_rank > 1:
+            
+            metrics["var_adr_light"]=var_adr_light
+            metrics["var_adr_plate"]=var_adr_plate
+            metrics["var_adr_object"]=var_adr_object
+
         wandb.log(metrics)
     
     ##################ADR##################
@@ -194,12 +207,8 @@ def train_and_aug(args, demo_files, log_dir, var_adr_light, var_adr_plate, var_a
         else:
             current_rank += 1
             is_var_adr = True
-
-    ##################Finish ADR##################
-    if current_rank == args['randomness_rank']+1:
-        is_stop = True
     
-    ##############Dump the file in meta-data#################
+    ##############Update the ADR parameters for different ranks#################
     if current_rank == 1:
         meta_data_path = f"{args['sim_dataset_folder']}/meta_data.pickle" 
         with open(meta_data_path,'rb') as file:
@@ -208,21 +217,37 @@ def train_and_aug(args, demo_files, log_dir, var_adr_light, var_adr_plate, var_a
         current_rank += 1
     else:
         meta_data_path = f"{args['sim_aug_dataset_folder']}/meta_data.pickle" 
-        all_meta_data = {'init_obj_poses': init_obj_poses, 'total_episodes': total_episodes, "best_success": best_success}
+        if current_rank == 2: 
+            var_adr_light = var_adr_light + 0.2 if is_var_adr else var_adr_light
+            if var_adr_light > 2:
+                var_adr_light = 2
+                current_rank += 1
+            
+        elif current_rank == 3:
+            var_adr_plate = var_adr_plate + 0.01 if is_var_adr else var_adr_plate
+            if var_adr_plate > 0.05:
+                var_adr_plate = 0.05
+                current_rank += 1
+            
+        elif current_rank == 4:
+            var_adr_object = var_adr_object + 0.01 if is_var_adr else var_adr_object
+            var_adr_plate = var_adr_plate + 0.005 if is_var_adr else var_adr_plate
+            if var_adr_object > 0.1:
+                var_adr_object = 0.1
+                var_adr_plate = 0.1
+                current_rank += 1
+
+        ##################Finish ADR##################
+        if current_rank == args['randomness_rank']+1:
+            is_stop = True
+           
+        all_meta_data = {'init_obj_poses': init_obj_poses, 'total_episodes': total_episodes, "best_success": best_success, "var_adr_light": var_adr_light,
+                         "var_adr_plate": var_adr_plate, "var_adr_object": var_adr_object, "is_var_adr": is_var_adr,  "is_stop": is_stop}
 
     with open(meta_data_path,'wb') as file:
         pickle.dump(all_meta_data, file)
-    
-    ##############Update the ADR parameters for different ranks#################
-    if current_rank == 2: 
-        var_adr_light = var_adr_light + 0.2 if is_var_adr else var_adr_light
-    elif current_rank == 3:
-        var_adr_plate = var_adr_plate + 0.01 if is_var_adr else var_adr_plate
-    elif current_rank == 4:
-        var_adr_object = var_adr_object + 0.01 if is_var_adr else var_adr_object
-        var_adr_plate = var_adr_plate + 0.01 if is_var_adr else var_adr_plate
 
-    return var_adr_light, var_adr_plate, var_adr_object, is_var_adr, current_rank, is_stop
+    return current_rank, is_stop
 
 def main(args):
     
@@ -242,23 +267,10 @@ def main(args):
             demo_files.append(os.path.join(args['sim_demo_folder'], file_name))
     
     ##########Initialize the ADR parameters##########
-    var_adr_light = 1
-    var_adr_plate = 0.01
-    var_adr_object = 0.01
-    is_var_adr = True
     current_rank = 1
-    is_stop = False
     for iteration in range(500):
         torch.cuda.empty_cache()
-        var_adr_light, var_adr_plate, var_adr_object, is_var_adr, current_rank, is_stop = train_and_aug(args, demo_files, log_dir, var_adr_light, var_adr_plate, 
-                                                                                                        var_adr_object, is_var_adr, current_rank, is_stop)
-        ################When var_adr_light = 2, var_adr_plate = 0.05, var_adr_object = 0.1, stop the augment#################
-        if (current_rank == 2 and var_adr_light > 2) or (current_rank == 3 and var_adr_plate > 0.05) or (current_rank == 4 and var_adr_object > 0.1):
-            var_adr_light = 2 if current_rank >= 2 else 1
-            var_adr_plate = 0.05 if current_rank >= 3 else 0.01
-            var_adr_object = 0.1 if current_rank >= 4 else 0.01
-            current_rank += 1
-            is_var_adr = True
+        current_rank, is_stop = train_and_aug(args, demo_files, log_dir, current_rank)
 
         if is_stop:
             ##############Final Train#################
