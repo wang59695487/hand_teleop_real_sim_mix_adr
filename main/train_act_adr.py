@@ -124,7 +124,7 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
     if current_rank == 1:
         epochs = args['num_epochs']
         eval_freq = args['eval_freq']
-    elif current_rank > 1:
+    elif current_rank > 1 and not is_stop:
         agent.load(os.path.join(args['sim_aug_dataset_folder'], f"epoch_best.pt"))
         epochs = 500  # 100, 200            
         eval_freq = 100 # 25, 50
@@ -324,6 +324,7 @@ def parse_args():
     parser.add_argument("--hidden_dim", default=256, type=int)
     parser.add_argument("--val-ratio", default=0.1, type=float)
     parser.add_argument("--randomness-rank", default=2, type=int)
+    parser.add_argument("--task-name", default="pick_place", type=str)
     
     args = parser.parse_args()
 
@@ -358,6 +359,7 @@ if __name__ == '__main__':
         "finetune": args.finetune,
         "randomness_rank": args.randomness_rank,
         "ckpt": args.ckpt,
+        "task_name": args.task_name,
         "seed": 20230930
     }
     args = argument_dependecy_checker(args)
