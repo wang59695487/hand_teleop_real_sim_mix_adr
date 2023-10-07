@@ -58,7 +58,7 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
 
         print('Replaying the sim demos and augmenting the dataset:')
         print('---------------------')
-        aug = {2:10,3:5,4:10}
+        aug = {2:10,3:10,4:10}
         ########### Add new sim demos to the original dataset ###########
         file1 = h5py.File(f"{args['sim_aug_dataset_folder']}/dataset.h5", 'a')
         for i in range(400):
