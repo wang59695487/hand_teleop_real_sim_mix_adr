@@ -58,40 +58,46 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
 
         print('Replaying the sim demos and augmenting the dataset:')
         print('---------------------')
-        aug = 0
+        aug = {2:10,3:5,4:10}
         ########### Add new sim demos to the original dataset ###########
         file1 = h5py.File(f"{args['sim_aug_dataset_folder']}/dataset.h5", 'a')
         for i in range(400):
             for _ , file_name in enumerate(demo_files):
                 print(file_name)
-                var_obj = var_adr_object if current_rank >= 4 else 0
-                var_plate = var_adr_plate if current_rank >= 3 else 0
-                x1, y1 = np.random.uniform(-0.02-var_obj,0.02+var_obj,2)
-                x2 = np.random.uniform(-0.02-var_plate, 0.02 + var_plate)
-                y2 = np.random.uniform(-0.02-var_plate*2, 0.02)
+                if args['task_name'] == 'pick_place':
+                    var_obj = var_adr_object if current_rank >= 4 else 0
+                    var_plate = var_adr_plate if current_rank >= 3 else 0
+                    x2 = np.random.uniform(-0.02-var_plate, 0.02 + var_plate)
+                    y2 = np.random.uniform(-0.02-var_plate*2, 0.02)
+                    if np.fabs(x2) <= 0.01 and np.fabs(y2) <= 0.01:
+                        continue
+                    init_pose_aug_plate = sapien.Pose([x2, y2, 0], [1, 0, 0, 0])
+                    
+                elif args['task_name'] == 'dclaw':
+                    var_obj = var_adr_object if current_rank >= 3 else 0
+                    init_pose_aug_plate = None
+        
+                x1, y1 = np.random.uniform(-0.02-var_obj,0.02+var_obj,2)        
                 if np.fabs(x1) <= 0.01 and np.fabs(y1) <= 0.01:
                     continue
-                elif np.fabs(x2) <= 0.01 and np.fabs(y2) <= 0.01:
-                    continue
-    
+                init_pose_aug_obj = sapien.Pose([x1, y1, 0], [1, 0, 0, 0])
+               
                 with open(file_name, 'rb') as file:
                     demo = pickle.load(file)
-
                 all_data = copy.deepcopy(demo)
-                init_pose_aug_obj = sapien.Pose([x1, y1, 0], [1, 0, 0, 0])
-                init_pose_aug_plate = sapien.Pose([x2, y2, 0], [1, 0, 0, 0])
+
                 visual_baked, meta_data, info_success = generate_sim_aug_in_play_demo(args, demo=all_data, init_pose_aug_plate=init_pose_aug_plate , 
                                                                                       init_pose_aug_obj=init_pose_aug_obj, var_adr_light=var_adr_light)
                 if not info_success:
                     continue
-                aug += 1
+                aug[current_rank] -= 1
                 init_obj_poses.append(meta_data['env_kwargs']['init_obj_pos'])
                 total_episodes, _, _ , _ = stack_and_save_frames_aug(visual_baked, total_episodes, args, file1)
             
-                if aug > 10:
+                if aug[current_rank] <= 0:
                     break
 
-            if aug > 10:
+            if aug[current_rank] <= 0:
                     break  
                 
         file1.close()
@@ -177,9 +183,8 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
                             metrics[f"avg_success_{rank}"] = np.mean(avg_success_chunk[rank])
                             avg_success += metrics[f"avg_success_{rank}"]
                             rank_list.remove(rank)
-                if len(rank_list) != 0:
-                    eval_player.eval_terminate()
-                    print("Eval timeout") 
+                
+                eval_player.eval_terminate()
                     
                 #################Calculate the average success#################
                 avg_success = avg_success/args['randomness_rank']
@@ -193,8 +198,10 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
         if current_rank > 1:
             
             metrics["var_adr_light"]=var_adr_light
-            metrics["var_adr_plate"]=var_adr_plate
             metrics["var_adr_object"]=var_adr_object
+            
+            if args['task_name'] == 'pick_place':
+                 metrics["var_adr_plate"]=var_adr_plate
 
         wandb.log(metrics)
     
@@ -225,18 +232,30 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
                 var_adr_light = 2
                 current_rank += 1
             
-        elif current_rank == 3:
+        elif current_rank == 3 and args['task_name'] == 'pick_place':
             var_adr_plate = var_adr_plate + 0.01 if is_var_adr else var_adr_plate
             if var_adr_plate > 0.05:
                 var_adr_plate = 0.05
                 current_rank += 1
             
-        elif current_rank == 4:
+        elif current_rank == 4 and args['task_name'] == 'pick_place':
             var_adr_object = var_adr_object + 0.01 if is_var_adr else var_adr_object
             var_adr_plate = var_adr_plate + 0.005 if is_var_adr else var_adr_plate
             if var_adr_object > 0.1:
                 var_adr_object = 0.1
                 var_adr_plate = 0.1
+                current_rank += 1
+        
+        elif current_rank == 3 and args['task_name'] == 'dclaw':
+            var_adr_object = var_adr_object + 0.01 if is_var_adr else var_adr_object
+            if var_adr_object > 0.1:
+                var_adr_object = 0.1
+                current_rank += 1
+        
+        elif current_rank == 4 and args['task_name'] == 'dclaw':
+            var_adr_object = var_adr_object + 0.01 if is_var_adr else var_adr_object
+            if var_adr_object > 0.2:
+                var_adr_object = 0.1
                 current_rank += 1
 
         ##################Finish ADR##################

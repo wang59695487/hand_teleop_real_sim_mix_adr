@@ -47,7 +47,6 @@ class DClawEnv(BaseSimulationEnv):
         # Load table
         # self.tables = self.create_lab_tables(table_height=0.73)
         self.tables = self.create_lab_tables(table_height=0.91)
-        # self.tables = self.create_table(table_height=0.6, table_half_size=[0.65, 0.65, 0.025])
 
         asset_path = Path(__file__).parent.parent.parent.parent / "assets"
         if "3x" in self.object_name:
@@ -56,7 +55,7 @@ class DClawEnv(BaseSimulationEnv):
             raise NotImplementedError
 
         loader = self.scene.create_urdf_loader()
-        loader.scale = self.object_scale
+        loader.scale = self.object_scale / 2
         loader.load_multiple_collisions_from_file = True
         builder = loader.load_file_as_articulation_builder(str(urdf_path))
         self.manipulated_object = builder.build(fix_root_link=True)
@@ -93,8 +92,6 @@ class DClawEnv(BaseSimulationEnv):
                     geom.set_material(mat)
 
     def reset_env(self):
-        # pose = self.generate_random_object_pose(self.randomness_scale)
-        # self.manipulated_object.set_pose(pose)
         self.manipulated_object.set_pose(self.init_pose)
 
     def create_lab_tables(self, table_height):

@@ -130,12 +130,6 @@ class DClawRLEnv(DClawEnv, BaseRLEnv):
 
         self.robot.set_pose(init_pose)
         self.reset_internal()
-        # reset the is_object_lifted flag
-        # NOTE: No randomness for now.
-        # self.object_episode_init_pose = self.manipulated_object.get_pose()
-        # random_quat = transforms3d.euler.euler2quat(*(self.np_random.randn(3) * self.object_pose_noise * 10))
-        # random_pos = self.np_random.randn(3) * self.object_pose_noise
-        # self.object_episode_init_pose = self.object_episode_init_pose * sapien.Pose(random_pos, random_quat)
         self.object_angle = self.get_object_rotate_angle()
         self.rounds = 0
         self.object_total_rotate_angle = 0

@@ -24,7 +24,7 @@ def generate_sim_aug_in_play_demo(args, demo, init_pose_aug_plate, init_pose_aug
     robot_name=args['robot_name']
     frame_skip=1
     aug_step_plate=400
-    aug_step_obj=500
+
     retarget=False
 
     from pathlib import Path
@@ -75,14 +75,6 @@ def generate_sim_aug_in_play_demo(args, demo, init_pose_aug_plate, init_pose_aug
         env = PickPlaceRLEnv(**env_params)
     elif task_name == 'dclaw':
         env = DClawRLEnv(**env_params)
-    elif task_name == 'hammer':
-        env = HammerRLEnv(**env_params)
-    elif task_name == 'table_door':
-        env = TableDoorRLEnv(**env_params)
-    elif task_name == 'insert_object':
-        env = InsertObjectRLEnv(**env_params)
-    elif task_name == 'mug_flip':
-        env = MugFlipRLEnv(**env_params)
     else:
         raise NotImplementedError
 
@@ -109,16 +101,7 @@ def generate_sim_aug_in_play_demo(args, demo, init_pose_aug_plate, init_pose_aug
             
     env.reset()
     
-    real_camera_cfg = {
-        "relocate_view": dict( pose=lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(224, 224))
-    }
-    
-    if task_name == 'table_door':
-         camera_cfg = {
-        "relocate_view": dict(position=np.array([-0.25, -0.25, 0.55]), look_at_dir=np.array([0.25, 0.25, -0.45]),
-                                right_dir=np.array([1, -1, 0]), fov=np.deg2rad(69.4), resolution=(224, 224))
-        }   
-         
+    real_camera_cfg = {"relocate_view": dict( pose=lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(224, 224))}   
     env.setup_camera_from_config(real_camera_cfg)
 
     # Specify modality
@@ -131,14 +114,6 @@ def generate_sim_aug_in_play_demo(args, demo, init_pose_aug_plate, init_pose_aug
         player = PickPlaceEnvPlayer(meta_data, data, env, zero_joint_pos=env_params["zero_joint_pos"])
     elif task_name == 'dclaw':
         player = DcLawEnvPlayer(meta_data, data, env, zero_joint_pos=env_params["zero_joint_pos"])
-    elif task_name == 'hammer':
-        player = HammerEnvPlayer(meta_data, data, env, zero_joint_pos=env_params["zero_joint_pos"])
-    elif task_name == 'table_door':
-        player = TableDoorEnvPlayer(meta_data, data, env, zero_joint_pos=env_params["zero_joint_pos"])
-    elif task_name == 'insert_object':
-        player = InsertObjectEnvPlayer(meta_data, data, env, zero_joint_pos=env_params["zero_joint_pos"])
-    elif task_name == 'mug_flip':
-        player = FlipMugEnvPlayer(meta_data, data, env, zero_joint_pos=env_params["zero_joint_pos"])
     else:
         raise NotImplementedError
 
@@ -173,19 +148,24 @@ def generate_sim_aug_in_play_demo(args, demo, init_pose_aug_plate, init_pose_aug
     hand_qpos_prev = baked_data["action"][0][env.arm_dof:]
     
     #################################Kinematic Augmentation####################################
-    meta_data["env_kwargs"]['init_target_pos'] = init_pose_aug_plate * meta_data["env_kwargs"]['init_target_pos']
+    if task_name == 'pick_place':
+        aug_step_obj=500
+        meta_data["env_kwargs"]['init_target_pos'] = init_pose_aug_plate * meta_data["env_kwargs"]['init_target_pos']
+        env.plate.set_pose(meta_data["env_kwargs"]['init_target_pos'])
+        aug_plate = np.array([init_pose_aug_obj.p[0],init_pose_aug_obj.p[1]])
+        one_step_aug_plate = np.array([(-1*init_pose_aug_obj.p[0]+init_pose_aug_plate.p[0])/aug_step_plate, (-1*init_pose_aug_obj.p[1]+init_pose_aug_plate.p[1])/aug_step_plate])
+    elif task_name == 'dclaw':
+        aug_step_obj=300
+    
     meta_data["env_kwargs"]['init_obj_pos'] = init_pose_aug_obj * meta_data["env_kwargs"]['init_obj_pos']
-    env.plate.set_pose(meta_data["env_kwargs"]['init_target_pos'])
     env.manipulated_object.set_pose(meta_data["env_kwargs"]['init_obj_pos'])
-
+    
     #################Avoid the case that the object is already close to the target################
     if task_name == 'pick_place' and env._is_close_to_target():
         return visual_baked, meta_data, False
 
     aug_obj = np.array([0,0])
     one_step_aug_obj = np.array([init_pose_aug_obj.p[0]/aug_step_obj, init_pose_aug_obj.p[0]/aug_step_obj])
-    aug_plate = np.array([init_pose_aug_obj.p[0],init_pose_aug_obj.p[1]])
-    one_step_aug_plate = np.array([(-1*init_pose_aug_obj.p[0]+init_pose_aug_plate.p[0])/aug_step_plate, (-1*init_pose_aug_obj.p[1]+init_pose_aug_plate.p[1])/aug_step_plate])
     
     valid_frame = 0
     stop_frame = 0
@@ -202,8 +182,6 @@ def generate_sim_aug_in_play_demo(args, demo, init_pose_aug_plate, init_pose_aug
             delta_hand_qpos = hand_qpos - hand_qpos_prev if idx!=0 else hand_qpos
             
             if ee_pose_delta < 0.001 and np.mean(handqpos2angle(delta_hand_qpos)) <= 1.2:
-                # print("delta_angle",np.mean(handqpos2angle(delta_hand_qpos)))
-                # print("!!!!!!!!!!!!!!!!!!!!!!skip1!!!!!!!!!!!!!!!!!!!!!")
                 continue
 
             else:
@@ -218,14 +196,14 @@ def generate_sim_aug_in_play_demo(args, demo, init_pose_aug_plate, init_pose_aug
                 palm_pose = env.ee_link.get_pose()
                 palm_pose = robot_pose.inv() * palm_pose
 
-                if env._is_object_lifted():
+                if env._is_object_lifted() and task_name == 'pick_place':
                     if aug_step_plate > 0:
                         aug_step_plate -= 1
                         #print("!!!!!!!!!!!!!!!!!!!!!!Alter!!!!!!!!!!!!!!!!!!!!!", aug_step_plate)
                         aug_plate = aug_plate + one_step_aug_plate
                     palm_next_pose = sapien.Pose([aug_plate[0],aug_plate[1],0],[1,0,0,0])*sapien.Pose(ee_pose_next[0:3], ee_pose_next[3:7])
                         
-                elif not env._is_object_lifted():
+                elif (not env._is_object_lifted()) or task_name == 'dclaw':
                     if aug_step_obj > 0:
                         aug_step_obj -= 1
                         #print("!!!!!!!!!!!!!!!!!!!!!!Alter!!!!!!!!!!!!!!!!!!!!!", aug_step_obj)
@@ -257,6 +235,8 @@ def generate_sim_aug_in_play_demo(args, demo, init_pose_aug_plate, init_pose_aug
 
                 if task_name == 'pick_place':
                     info_success = info["is_object_lifted"] and env._object_target_distance() <= 0.2 and env._is_object_plate_contact()    
+                elif task_name == 'dclaw':
+                    info_success = info['success']
 
                 if info_success:
                     stop_frame += 1
