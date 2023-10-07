@@ -136,7 +136,7 @@ nohup python main/train_act_adr.py \
     --backbone-type=regnet_y_3_2gf \
     --sim-batch-size=128 \
     --lr=1e-5 \
-    --kl_weight=20 \
+    --kl_weight=200 \
     --weight_decay=1e-2 \
     --val-ratio=0.1 \
     --num-epochs=600 \
