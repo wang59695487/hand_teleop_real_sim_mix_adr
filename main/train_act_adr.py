@@ -58,7 +58,7 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
 
         print('Replaying the sim demos and augmenting the dataset:')
         print('---------------------')
-        aug = {2:10,3:5,4:15,5:100}
+        aug = {2:5,3:10,4:15,5:100}
         ########### Add new sim demos to the original dataset ###########
         file1 = h5py.File(f"{args['sim_aug_dataset_folder']}/dataset.h5", 'a')
         for i in range(400):
@@ -162,10 +162,10 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
                 avg_success = 0
                 for rank in range(1,args['randomness_rank']+1):
                     var_object = [0,0] if rank < 4 else [0.05,0.08]  # 0.05, 0.1
-                    x = np.linspace(-0.1-var_object[0], 0.12+var_object[0], 5)   # -0.08 0.08 /// -0.05 0
+                    x = np.linspace(-0.08-var_object[0], 0.12+var_object[1], 5)   # -0.08 0.08 /// -0.05 0
                     y = np.linspace(0.2-var_object[1], 0.3+var_object[1], 4)  # 0.12 0.18 /// 0.12 0.32
                     for i in range(20):
-                        eval_player.eval_start(log_dir, epoch+1, i+1, x[int(i/5)], y[i%5], rank)
+                        eval_player.eval_start(log_dir, epoch+1, i+1, x[int(i/4)], y[i%4], rank)
                
                 timeout_in_seconds = 80*args['randomness_rank']
                 start = time.time()
@@ -232,17 +232,15 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
                 current_rank += 1
             
         elif current_rank == 3 and args['task_name'] == 'pick_place':
-            var_adr_plate = var_adr_plate + 0.01 if is_var_adr else var_adr_plate
-            if var_adr_plate > 0.06:
-                var_adr_plate = 0.06
+            var_adr_plate = var_adr_plate + 0.02 if is_var_adr else var_adr_plate
+            if var_adr_plate > 0.12:
+                var_adr_plate = 0.12
                 current_rank += 1
             
         elif current_rank == 4 and args['task_name'] == 'pick_place':
             var_adr_object = var_adr_object + 0.02 if is_var_adr else var_adr_object
-            var_adr_plate = var_adr_plate + 0.01 if is_var_adr else var_adr_plate
             if var_adr_object > 0.12:
                 var_adr_object = 0.12
-                var_adr_plate = 0.12
                 current_rank += 1
         
         elif current_rank == 3 and args['task_name'] == 'dclaw':
