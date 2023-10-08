@@ -199,10 +199,10 @@ def eval_in_env(args, log_dir, epoch, eval_idx, x, y, randomness_rank, policy, a
     ########### Add Plate Randomness ############
     if randomness_rank > 2 and task_name == "pick_place":
         ########### Randomize the plate pose ############
-        var_plate = 0.05 if randomness_rank < 4 else 0.1
+        var_plate = [0.08,0.2] if randomness_rank < 4 else [0.16,0.2]
         print("############################Randomize the plate pose##################")
-        x2 = np.random.uniform(-var_plate, var_plate)
-        y2 = np.random.uniform(0, var_plate*2)
+        x2 = np.random.uniform(-var_plate[0], var_plate[0])
+        y2 = np.random.uniform(0, var_plate[1])
         plate_random_plate = sapien.Pose([-0.005+x2, -0.1-y2, 0],[1,0,0,0]) 
         dist_xy = np.linalg.norm(object_pos.p[:2] - plate_random_plate.p[:2])
         if dist_xy >= 0.25:

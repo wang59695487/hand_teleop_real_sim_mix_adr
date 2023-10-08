@@ -47,8 +47,8 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
                 total_episodes = 0
                 init_obj_poses = []
                 var_adr_light = 1
-                var_adr_plate = 0.01
-                var_adr_object = 0.01
+                var_adr_plate = 0.02
+                var_adr_object = 0.02
                 is_var_adr = True
                 is_stop = False
                 meta_data_path = f"{args['sim_dataset_folder']}/meta_data.pickle" 
@@ -58,7 +58,7 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
 
         print('Replaying the sim demos and augmenting the dataset:')
         print('---------------------')
-        aug = {2:10,3:5,4:10}
+        aug = {2:10,3:5,4:15,5:100}
         ########### Add new sim demos to the original dataset ###########
         file1 = h5py.File(f"{args['sim_aug_dataset_folder']}/dataset.h5", 'a')
         for i in range(400):
@@ -126,11 +126,11 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
         eval_freq = args['eval_freq']
     elif current_rank > 1 and not is_stop:
         agent.load(os.path.join(args['sim_aug_dataset_folder'], f"epoch_best.pt"))
-        epochs = 500  # 100, 200            
+        epochs = 300  # 100, 200            
         eval_freq = 100 # 25, 50
     elif is_stop:
         agent.load(os.path.join(args['sim_aug_dataset_folder'], f"epoch_best.pt"))
-        epochs = 2000  # 100, 200
+        epochs = 2500  # 100, 200
         eval_freq = 100 # 25, 50
     
     L = Logger("{}_{}".format(args['model_name'],epochs))
@@ -161,9 +161,9 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
                 eval_player.eval_init()
                 avg_success = 0
                 for rank in range(1,args['randomness_rank']+1):
-                    var_object = [0,0] if rank < 3 else [0.05,0.1]  # 0.05, 0.1
-                    x = np.linspace(-0.1-var_object[0], 0.1+var_object[0], 4)   # -0.08 0.08 /// -0.05 0
-                    y = np.linspace(0.2-var_object[1], 0.3+var_object[1], 5)  # 0.12 0.18 /// 0.12 0.32
+                    var_object = [0,0] if rank < 4 else [0.05,0.08]  # 0.05, 0.1
+                    x = np.linspace(-0.1-var_object[0], 0.12+var_object[0], 5)   # -0.08 0.08 /// -0.05 0
+                    y = np.linspace(0.2-var_object[1], 0.3+var_object[1], 4)  # 0.12 0.18 /// 0.12 0.32
                     for i in range(20):
                         eval_player.eval_start(log_dir, epoch+1, i+1, x[int(i/5)], y[i%5], rank)
                
@@ -226,23 +226,23 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
     else:
         meta_data_path = f"{args['sim_aug_dataset_folder']}/meta_data.pickle" 
         if current_rank == 2: 
-            var_adr_light = var_adr_light + 0.2 if is_var_adr else var_adr_light
-            if var_adr_light > 2:
-                var_adr_light = 2
+            var_adr_light = var_adr_light + 0.5 if is_var_adr else var_adr_light
+            if var_adr_light > 3:
+                var_adr_light = 3
                 current_rank += 1
             
         elif current_rank == 3 and args['task_name'] == 'pick_place':
             var_adr_plate = var_adr_plate + 0.01 if is_var_adr else var_adr_plate
-            if var_adr_plate > 0.05:
-                var_adr_plate = 0.05
+            if var_adr_plate > 0.06:
+                var_adr_plate = 0.06
                 current_rank += 1
             
         elif current_rank == 4 and args['task_name'] == 'pick_place':
-            var_adr_object = var_adr_object + 0.01 if is_var_adr else var_adr_object
-            var_adr_plate = var_adr_plate + 0.005 if is_var_adr else var_adr_plate
-            if var_adr_object > 0.1:
-                var_adr_object = 0.1
-                var_adr_plate = 0.1
+            var_adr_object = var_adr_object + 0.02 if is_var_adr else var_adr_object
+            var_adr_plate = var_adr_plate + 0.01 if is_var_adr else var_adr_plate
+            if var_adr_object > 0.12:
+                var_adr_object = 0.12
+                var_adr_plate = 0.12
                 current_rank += 1
         
         elif current_rank == 3 and args['task_name'] == 'dclaw':
