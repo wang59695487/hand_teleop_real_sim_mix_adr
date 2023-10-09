@@ -58,7 +58,7 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
 
         print('Replaying the sim demos and augmenting the dataset:')
         print('---------------------')
-        aug = {2:5,3:10,4:15,5:100}
+        aug = {2:10,3:5,4:10,5:100}
         ########### Add new sim demos to the original dataset ###########
         file1 = h5py.File(f"{args['sim_aug_dataset_folder']}/dataset.h5", 'a')
         for i in range(400):
@@ -226,9 +226,9 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
     else:
         meta_data_path = f"{args['sim_aug_dataset_folder']}/meta_data.pickle" 
         if current_rank == 2: 
-            var_adr_light = var_adr_light + 0.5 if is_var_adr else var_adr_light
-            if var_adr_light > 3:
-                var_adr_light = 3
+            var_adr_light = var_adr_light + 0.2 if is_var_adr else var_adr_light
+            if var_adr_light > 2:
+                var_adr_light = 2
                 current_rank += 1
             
         elif current_rank == 3 and args['task_name'] == 'pick_place':
