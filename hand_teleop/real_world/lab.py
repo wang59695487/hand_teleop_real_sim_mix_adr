@@ -14,7 +14,7 @@ CAM2ROBOT = Pose.from_transformation_matrix(np.array([[ 0.05403586,  0.37436257,
 DESK2ROBOT_Z_AXIS = 0.00855
 
 # simulation fov
-fov = np.deg2rad(47)
+fov = np.deg2rad(58.4)
 
 # Relocate
 RELOCATE_BOUND = [0.2, 0.8, -0.4, 0.4, DESK2ROBOT_Z_AXIS + 0.005, 0.6]
