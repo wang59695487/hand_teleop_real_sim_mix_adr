@@ -1,9 +1,7 @@
 import os
 import numpy as np
 import h5py
-import imageio
-import cv2
-import copy
+from tqdm import tqdm
 from argparse import ArgumentParser
 
 import torch
@@ -11,13 +9,8 @@ import torchvision
 import torchvision.transforms as T
 from torchvision.transforms import v2
 
-
-from hand_teleop.env.rl_env.laptop_env import LaptopRLEnv
 from hand_teleop.env.rl_env.pick_place_env import PickPlaceRLEnv
 from hand_teleop.env.rl_env.dclaw_env import DClawRLEnv
-from hand_teleop.env.rl_env.table_door_env import TableDoorRLEnv
-from hand_teleop.env.rl_env.insert_object_env import InsertObjectRLEnv
-from hand_teleop.env.rl_env.hammer_env import HammerRLEnv
 from hand_teleop.player.player import *
 from hand_teleop.player.randomization_utils import *
 from hand_teleop.real_world import lab
@@ -152,7 +145,7 @@ def play_one_real_sim_visual_demo(args, demo, real_demo=None, real_images=None, 
     meta_data["env_kwargs"].pop('task_name')
     meta_data["task_name"] = task_name
     data = demo["data"]
-    rotation_reward_weight = 0
+  
     use_visual_obs = True
     if 'allegro' in robot_name:
         if 'finger_control_params' in meta_data.keys():
@@ -169,7 +162,8 @@ def play_one_real_sim_visual_demo(args, demo, real_demo=None, real_images=None, 
     env_params['robot_name'] = robot_name
     env_params['use_visual_obs'] = use_visual_obs
     env_params['use_gui'] = False
- 
+    env_params['object_name'] = args['object_name']
+    env_params['randomness_scale'] = 2
 
     # Specify rendering device if the computing device is given
     if "CUDA_VISIBLE_DEVICES" in os.environ:
@@ -192,21 +186,8 @@ def play_one_real_sim_visual_demo(args, demo, real_demo=None, real_images=None, 
         env = PickPlaceRLEnv(**env_params)
     elif task_name == 'dclaw':
         env = DClawRLEnv(**env_params)
-    elif task_name == 'hammer':
-        env = HammerRLEnv(**env_params)
-    elif task_name == 'table_door':
-        env = TableDoorRLEnv(**env_params)
-    elif task_name == 'insert_object':
-        env = InsertObjectRLEnv(**env_params)
-    elif task_name == 'mug_flip':
-        env = MugFlipRLEnv(**env_params)
     else:
         raise NotImplementedError
-    
-    if domain_randomization:
-        p = np.random.rand(1)[0]
-        if p <= randomization_prob:
-            env = randomize_env_colors(task_name=task_name, env=env)
 
     if not retarget:
         if "free" in robot_name:
@@ -231,15 +212,7 @@ def play_one_real_sim_visual_demo(args, demo, real_demo=None, real_images=None, 
 
     env.reset()
 
-    real_camera_cfg = {
-        "relocate_view": dict( pose= lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(224, 224))
-    }
-
-    if task_name == 'table_door':
-         camera_cfg = {
-        "relocate_view": dict(position=np.array([-0.25, -0.25, 0.55]), look_at_dir=np.array([0.25, 0.25, -0.45]),
-                                right_dir=np.array([1, -1, 0]), fov=np.deg2rad(69.4), resolution=(224, 224))
-        }   
+    real_camera_cfg = { "relocate_view": dict( pose= lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(224, 224))}
 
     env.setup_camera_from_config(real_camera_cfg)
 
@@ -253,14 +226,6 @@ def play_one_real_sim_visual_demo(args, demo, real_demo=None, real_images=None, 
         player = PickPlaceEnvPlayer(meta_data, data, env, zero_joint_pos=env_params["zero_joint_pos"])
     elif task_name == 'dclaw':
         player = DcLawEnvPlayer(meta_data, data, env, zero_joint_pos=env_params["zero_joint_pos"])
-    elif task_name == 'hammer':
-        player = HammerEnvPlayer(meta_data, data, env, zero_joint_pos=env_params["zero_joint_pos"])
-    elif task_name == 'table_door':
-        player = TableDoorEnvPlayer(meta_data, data, env, zero_joint_pos=env_params["zero_joint_pos"])
-    elif task_name == 'insert_object':
-        player = InsertObjectEnvPlayer(meta_data, data, env, zero_joint_pos=env_params["zero_joint_pos"])
-    elif task_name == 'mug_flip':
-        player = FlipMugEnvPlayer(meta_data, data, env, zero_joint_pos=env_params["zero_joint_pos"])
     else:
         raise NotImplementedError
 
@@ -279,10 +244,9 @@ def play_one_real_sim_visual_demo(args, demo, real_demo=None, real_images=None, 
         baked_data = player.bake_demonstration()
     
     visual_baked = dict(obs=[], action=[],robot_qpos=[])
-
-    
     env.reset()
     player.scene.unpack(player.get_sim_data(0))
+    
     for _ in range(player.env.frame_skip):
         player.scene.step()
     if player.human_robot_hand is not None:
@@ -297,8 +261,6 @@ def play_one_real_sim_visual_demo(args, demo, real_demo=None, real_images=None, 
             env.robot.set_qvel(baked_data["robot_qvel"][0])
 
     robot_pose = env.robot.get_pose()
-    rotation_matrix = transforms3d.quaternions.quat2mat(robot_pose.q)
-    world_to_robot = transforms3d.affines.compose(-np.matmul(rotation_matrix.T,robot_pose.p),rotation_matrix.T,np.ones(3))
 
     if using_real_data:
         ee_pose = baked_data[0]["ee_pose"]
@@ -309,7 +271,7 @@ def play_one_real_sim_visual_demo(args, demo, real_demo=None, real_images=None, 
     
     if using_real_data:
 
-        for idx in range(len(baked_data)):
+        for idx in tqdm(range(len(baked_data))):
             
             # NOTE: robot.get_qpos() version
             if idx != len(baked_data)-1:
@@ -371,7 +333,7 @@ def play_one_real_sim_visual_demo(args, demo, real_demo=None, real_images=None, 
     else:
         valid_frame = 0
         stop_frame = 0
-        for idx in range(0,len(baked_data['obs']),frame_skip):
+        for idx in tqdm(range(0,len(baked_data['obs']),frame_skip)):
             # NOTE: robot.get_qpos() version
             if idx != len(baked_data['obs'])-frame_skip:
                 ee_pose_next = baked_data["ee_pose"][idx + frame_skip]
@@ -414,7 +376,7 @@ def play_one_real_sim_visual_demo(args, demo, real_demo=None, real_images=None, 
                                                       env.ee_link.get_pose().p,env.ee_link.get_pose().q]))
 
                     _ , _ , _ , info = env.step(target_qpos)
-
+                    
                     if task_name == "pick_place":
                         info_success = info["is_object_lifted"] and info["success"]
                     
