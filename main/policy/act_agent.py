@@ -71,6 +71,7 @@ def get_args_parser():
     parser.add_argument("--eval-randomness-scale", default=0, type=int)
     parser.add_argument("--randomness-rank", default=1, type=int)
     parser.add_argument("--finetune", action="store_true")
+    parser.add_argument("--task-name", default="pick_place", type=str)
 
     return parser
 

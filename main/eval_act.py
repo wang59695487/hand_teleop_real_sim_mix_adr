@@ -78,14 +78,8 @@ def create_env(args):
 
     if task_name == 'pick_place':
         env = PickPlaceRLEnv(**env_params)
-    elif task_name == 'hammer':
-        env = HammerRLEnv(**env_params)
-    elif task_name == 'table_door':
-        env = TableDoorRLEnv(**env_params)
-    elif task_name == 'insert_object':
-        env = InsertObjectRLEnv(**env_params)
-    elif task_name == 'mug_flip':
-        env = MugFlipRLEnv(**env_params)
+    elif task_name == 'dclaw':
+        env = DClawRLEnv(**env_params)
     else:
         raise NotImplementedError
     env.seed(0)

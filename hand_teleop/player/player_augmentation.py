@@ -155,7 +155,7 @@ def generate_sim_aug_in_play_demo(args, demo, init_pose_aug_plate, init_pose_aug
         aug_plate = np.array([init_pose_aug_obj.p[0],init_pose_aug_obj.p[1]])
         one_step_aug_plate = np.array([(-1*init_pose_aug_obj.p[0]+init_pose_aug_plate.p[0])/aug_step_plate, (-1*init_pose_aug_obj.p[1]+init_pose_aug_plate.p[1])/aug_step_plate])
     elif task_name == 'dclaw':
-        aug_step_obj=300
+        aug_step_obj=50
     
     meta_data["env_kwargs"]['init_obj_pos'] = init_pose_aug_obj * meta_data["env_kwargs"]['init_obj_pos']
     env.manipulated_object.set_pose(meta_data["env_kwargs"]['init_obj_pos'])

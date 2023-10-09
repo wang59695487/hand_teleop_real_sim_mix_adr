@@ -129,10 +129,7 @@ def play_multiple_real_visual(args):
 
 def play_one_real_sim_visual_demo(args, demo, real_demo=None, real_images=None, using_real_data = False):
     robot_name=args['robot_name']
-    domain_randomization=args['domain_randomization']
     retarget = args['retarget']
-    randomization_prob=args['randomization_prob']
-    retarget=args['retarget']
     frame_skip=args['frame_skip']
 
     if robot_name == 'mano':
