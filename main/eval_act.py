@@ -13,15 +13,8 @@ from typing import Callable, List, Tuple
 import sapien.core as sapien
 import tqdm
 
-
-from hand_teleop.env.rl_env.base import BaseRLEnv
-from hand_teleop.env.rl_env.pen_draw_env import PenDrawRLEnv
-from hand_teleop.env.rl_env.relocate_env import RelocateRLEnv
-from hand_teleop.env.rl_env.table_door_env import TableDoorRLEnv
-from hand_teleop.env.rl_env.mug_flip_env import MugFlipRLEnv
 from hand_teleop.env.rl_env.pick_place_env import PickPlaceRLEnv
-from hand_teleop.env.rl_env.insert_object_env import InsertObjectRLEnv
-from hand_teleop.env.rl_env.hammer_env import HammerRLEnv
+from hand_teleop.env.rl_env.dclaw_env import DClawRLEnv
 
 from hand_teleop.player.randomization_utils import *
 from hand_teleop.player.player import *
@@ -56,6 +49,7 @@ def create_env(args):
         if 'robot_arm_control_params' in meta_data.keys():
             robot_arm_control_params = meta_data['robot_arm_control_params']            
 
+    # Create env 
     env_params = meta_data["env_kwargs"]
     env_params['robot_name'] = robot_name
     env_params['use_visual_obs'] = True
@@ -72,7 +66,7 @@ def create_env(args):
         print('Found initial object pose')
         env_params['init_obj_pos'] = meta_data["env_kwargs"]['init_obj_pos']
 
-    if 'init_target_pos' in meta_data["env_kwargs"].keys():
+    if 'init_target_pos' in meta_data["env_kwargs"].keys() and task_name == 'pick_place':
         print('Found initial target pose')
         env_params['init_target_pos'] = meta_data["env_kwargs"]['init_target_pos']
 
@@ -82,6 +76,7 @@ def create_env(args):
         env = DClawRLEnv(**env_params)
     else:
         raise NotImplementedError
+    
     env.seed(0)
     env.reset()
    
@@ -185,31 +180,35 @@ def eval_in_env(args, log_dir, epoch, eval_idx, x, y, randomness_rank, policy, a
     idx = np.random.randint(len(meta_data['init_obj_poses']))
     sampled_pos = meta_data['init_obj_poses'][idx]
     object_p = np.array([x, y, sampled_pos.p[-1]])
-    object_pos = sapien.Pose(p=object_p, q=sampled_pos.q)
+    object_pos = sapien.Pose(p=object_p, q=sampled_pos.q) if task_name == "pick_place" else sapien.Pose(p=object_p, q=[0.707, 0, 0, 0.707])
     print('Object Pos: {}'.format(object_pos))
 
     env.manipulated_object.set_pose(object_pos)
         
     ########### Add Plate Randomness ############
-    if randomness_rank > 2 and task_name == "pick_place":
-        ########### Randomize the plate pose ############
-        var_plate = [0.08,0.2] if randomness_rank < 4 else [0.16,0.2]
-        print("############################Randomize the plate pose##################")
-        x2 = np.random.uniform(-var_plate[0], var_plate[0])
-        y2 = np.random.uniform(0, var_plate[1])
-        plate_random_plate = sapien.Pose([-0.005+x2, -0.1-y2, 0],[1,0,0,0]) 
-        dist_xy = np.linalg.norm(object_pos.p[:2] - plate_random_plate.p[:2])
-        if dist_xy >= 0.25:
-            env.plate.set_pose(plate_random_plate)
+    if task_name == "pick_place":
+        if randomness_rank > 2:
+            ########### Randomize the plate pose ############
+            var_plate = [0.08,0.2] if randomness_rank < 4 else [0.16,0.2]
+            print("############################Randomize the plate pose##################")
+            x2 = np.random.uniform(-var_plate[0], var_plate[0])
+            y2 = np.random.uniform(0, var_plate[1])
+            plate_random_plate = sapien.Pose([-0.005+x2, -0.1-y2, 0],[1,0,0,0]) 
+            dist_xy = np.linalg.norm(object_pos.p[:2] - plate_random_plate.p[:2])
+            if dist_xy >= 0.25:
+                env.plate.set_pose(plate_random_plate)
+            else:
+                env.plate.set_pose(sapien.Pose([-0.005, -0.12, 0],[1,0,0,0]))
+            print('Target Pos: {}'.format(plate_random_plate))
         else:
             env.plate.set_pose(sapien.Pose([-0.005, -0.12, 0],[1,0,0,0]))
-        print('Target Pos: {}'.format(plate_random_plate))
-    else:
-        env.plate.set_pose(sapien.Pose([-0.005, -0.12, 0],[1,0,0,0]))
-        
+   
     for _ in range(10*env.frame_skip):
         env.scene.step()
-
+    
+    if task_name == "dclaw":
+        env.reset()
+            
     obs = env.get_observation()
     success = False
     max_time_step = 1000
@@ -264,7 +263,7 @@ def eval_in_env(args, log_dir, epoch, eval_idx, x, y, randomness_rank, policy, a
         video_path = os.path.join(log_dir, f"epoch_{epoch}_{eval_idx}_rank{randomness_rank}_{success}_{is_lifted}.mp4")
     elif task_name == "dclaw":
         total_angle = info["object_total_rotate_angle"]
-        video_path = os.path.join(log_dir, f"epoch_{epoch}_{eval_idx}_{success}_{total_angle}.mp4")
+        video_path = os.path.join(log_dir, f"epoch_{epoch}_{eval_idx}_rank{randomness_rank}_{success}_{total_angle}.mp4")
     #imageio version 2.28.1 imageio-ffmpeg version 0.4.8 scikit-image version 0.20.0
     imageio.mimsave(video_path, video, fps=120)
     avg_success.append(int(success))

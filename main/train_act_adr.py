@@ -13,11 +13,11 @@ import multiprocessing as mp
 from main.policy.act_agent import ActAgent
 
 from eval_act import Eval_player
+from adr import adr, aug_in_adr
 from logger import Logger
 from dataset.act_dataset import argument_dependecy_checker, prepare_sim_aug_data, set_seed
 from main.train_act import train_in_one_epoch
-from hand_teleop.player.player_augmentation import generate_sim_aug_in_play_demo
-from hand_teleop.player.play_multiple_demonstrations_act import stack_and_save_frames_aug
+
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -25,94 +25,8 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
     # read and prepare data
     set_seed(args["seed"])
        
-    if current_rank > 1: 
-
-        for file_name in os.listdir(args['sim_aug_dataset_folder']):
-            if "meta_data.pickle" in file_name:
-                meta_data_path = f"{args['sim_aug_dataset_folder']}/meta_data.pickle" 
-                with open(meta_data_path,'rb') as file:
-                    all_meta_data = pickle.load(file)
-                last_total_episodes = all_meta_data['total_episodes']
-                total_episodes = last_total_episodes
-                init_obj_poses = all_meta_data['init_obj_poses']
-                last_best_success = all_meta_data['best_success']
-                var_adr_light = all_meta_data['var_adr_light']
-                var_adr_plate = all_meta_data['var_adr_plate']
-                var_adr_object = all_meta_data['var_adr_object']
-                is_var_adr = all_meta_data['is_var_adr']
-                is_stop = all_meta_data['is_stop']
-                break
-            else:
-                last_total_episodes = 0
-                total_episodes = 0
-                init_obj_poses = []
-                var_adr_light = 1
-                var_adr_plate = 0.02
-                var_adr_object = 0.02
-                is_var_adr = True
-                is_stop = False
-                meta_data_path = f"{args['sim_dataset_folder']}/meta_data.pickle" 
-                with open(meta_data_path,'rb') as file:
-                    all_meta_data = pickle.load(file)
-                last_best_success = all_meta_data['best_success']
-
-        print('Replaying the sim demos and augmenting the dataset:')
-        print('---------------------')
-        aug = {2:5,3:10,4:15,5:15}
-        ########### Add new sim demos to the original dataset ###########
-        file1 = h5py.File(f"{args['sim_aug_dataset_folder']}/dataset.h5", 'a')
-        for i in range(400):
-            for _ , file_name in enumerate(demo_files):
-                print(file_name)
-                if args['task_name'] == 'pick_place':
-                    var_obj = var_adr_object if current_rank >= 4 else 0
-                    x1, y1 = np.random.uniform(-0.02-var_obj,0.02+var_obj,2)        
-                    if np.fabs(x1) <= 0.01 and np.fabs(y1) <= 0.01:
-                        continue
-                    init_pose_aug_obj = sapien.Pose([x1, y1, 0], [1, 0, 0, 0])
-                    
-                    var_plate = var_adr_plate if current_rank >= 3 else 0
-                    x2 = np.random.uniform(-0.02-var_plate, 0.02 + var_plate)
-                    y2 = np.random.uniform(-0.02-var_plate*2, 0.02)
-                    if np.fabs(x2) <= 0.01 and np.fabs(y2) <= 0.01:
-                        continue
-                    init_pose_aug_plate = sapien.Pose([x2, y2, 0], [1, 0, 0, 0])
-                    
-                elif args['task_name'] == 'dclaw':
-                    var_obj = var_adr_object if current_rank >= 3 else 0
-                    x1 = np.random.uniform(-var_obj/2,var_obj/2)
-                    y1 = np.random.uniform(-var_obj,var_obj)
-                    init_pose_aug_obj = sapien.Pose([x1, y1, 0], [1, 0, 0, 0])
-                    init_pose_aug_plate = None
-        
-                with open(file_name, 'rb') as file:
-                    demo = pickle.load(file)
-                all_data = copy.deepcopy(demo)
-
-                visual_baked, meta_data, info_success = generate_sim_aug_in_play_demo(args, demo=all_data, init_pose_aug_plate=init_pose_aug_plate , 
-                                                                                      init_pose_aug_obj=init_pose_aug_obj, var_adr_light=var_adr_light)
-                if not info_success:
-                    continue
-                aug[current_rank] -= 1
-                init_obj_poses.append(meta_data['env_kwargs']['init_obj_pos'])
-                total_episodes, _, _ , _ = stack_and_save_frames_aug(visual_baked, total_episodes, args, file1)
-            
-                if aug[current_rank] <= 0:
-                    break
-
-            if aug[current_rank] <= 0:
-                    break  
-                
-        file1.close()
-        sim_aug_demo_length = total_episodes
-        sim_aug_path = args['sim_aug_dataset_folder']
-    else:
-        os.makedirs(args['sim_aug_dataset_folder'])
-        last_best_success = 0
-        sim_aug_demo_length = None
-        sim_aug_path = None
-        is_stop = False
-
+    sim_aug_demo_length, sim_aug_path, adr_dict = aug_in_adr(args, current_rank, demo_files)
+   
     Prepared_Data = prepare_sim_aug_data(sim_dataset_folder=args['sim_dataset_folder'],sim_dataset_aug_folder=sim_aug_path, sim_aug_demo_length=sim_aug_demo_length, sim_batch_size=args['sim_batch_size'],
                                  val_ratio=args['val_ratio'], seed = 20230920, chunk_size=args['num_queries'])
     
@@ -127,11 +41,11 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
     if current_rank == 1:
         epochs = args['num_epochs']
         eval_freq = args['eval_freq']
-    elif current_rank > 1 and not is_stop:
+    elif current_rank > 1 and not adr_dict['is_stop']:
         agent.load(os.path.join(args['sim_aug_dataset_folder'], f"epoch_best.pt"))
         epochs = 300  # 100, 200            
         eval_freq = 100 # 25, 50
-    elif is_stop:
+    elif adr_dict['is_stop']:
         agent.load(os.path.join(args['sim_aug_dataset_folder'], f"epoch_best.pt"))
         epochs = 1000  # 100, 200
         eval_freq = 100 # 25, 50
@@ -167,7 +81,7 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
                     if args['task_name'] == 'pick_place':
                         var_object = [0,0] if rank < 4 else [0.05,0.08]  # 0.05, 0.1
                         x = np.linspace(-0.08-var_object[0], 0.12+var_object[1], 5)   # -0.08 0.08 /// -0.05 0
-                        y = np.linspace(0.2-var_object[1], 0.3+var_object[1], 4)  # 0.12 0.18 /// 0.12 0.32
+                        y = np.linspace(0.2-var_object[1], 0.3+var_object[0], 4)  # 0.12 0.18 /// 0.12 0.32
                         for i in range(20):
                             eval_player.eval_start(log_dir, epoch+1, i+1, x[int(i/4)], y[i%4], rank)
                     elif args['task_name'] == 'dclaw':
@@ -205,82 +119,23 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
                 metrics["avg_success"] = avg_success
                 if avg_success > best_success:
                     best_success = avg_success
-                    if best_success > last_best_success:
+                    if best_success > adr_dict['last_best_success']:
                         agent.save(os.path.join(args['sim_aug_dataset_folder'], f"epoch_best.pt"), args)
                 metrics["best_success"] = best_success
 
         if current_rank > 1:
             
-            metrics["var_adr_light"]=var_adr_light
-            metrics["var_adr_object"]=var_adr_object
+            metrics["var_adr_light"]=adr_dict['var_adr_light']
+            metrics["var_adr_object"]=adr_dict['var_adr_object']
             
             if args['task_name'] == 'pick_place':
-                 metrics["var_adr_plate"]=var_adr_plate
+                 metrics["var_adr_plate"]=adr_dict['var_adr_plate']
 
         wandb.log(metrics)
-    
-    ##################ADR##################
-    if best_success <= last_best_success - 0.1:
-        total_episodes = last_total_episodes
-        best_success = last_best_success
-        ################Cancel the augment in environment domain and continue sample in the original domain#################
-        if is_var_adr:
-            is_var_adr = False
-        ################Cancel sample in the original domain and Exit#################
-        else:
-            current_rank += 1
-            is_var_adr = True
-    
-    ##############Update the ADR parameters for different ranks#################
-    if current_rank == 1:
-        meta_data_path = f"{args['sim_dataset_folder']}/meta_data.pickle" 
-        with open(meta_data_path,'rb') as file:
-            all_meta_data = pickle.load(file)
-        all_meta_data["best_success"] = best_success
-        current_rank += 1
-    else:
-        meta_data_path = f"{args['sim_aug_dataset_folder']}/meta_data.pickle" 
-        if current_rank == 2: 
-            var_adr_light = var_adr_light + 0.2 if is_var_adr else var_adr_light
-            if var_adr_light > 2:
-                var_adr_light = 2
-                current_rank += 1
-            
-        elif current_rank == 3 and args['task_name'] == 'pick_place':
-            var_adr_plate = var_adr_plate + 0.02 if is_var_adr else var_adr_plate
-            if var_adr_plate > 0.1:
-                var_adr_plate = 0.1
-                current_rank += 1
-            
-        elif current_rank == 4 and args['task_name'] == 'pick_place':
-            var_adr_object = var_adr_object + 0.02 if is_var_adr else var_adr_object
-            if var_adr_object > 0.1:
-                var_adr_object = 0.1
-                current_rank += 1
         
-        elif current_rank == 3 and args['task_name'] == 'dclaw':
-            var_adr_object = var_adr_object + 0.02 if is_var_adr else var_adr_object
-            if var_adr_object > 0.1:
-                var_adr_object = 0.1
-                current_rank += 1
-        
-        elif current_rank == 4 and args['task_name'] == 'dclaw':
-            var_adr_object = var_adr_object + 0.02 if is_var_adr else var_adr_object
-            if var_adr_object > 0.2:
-                var_adr_object = 0.2
-                current_rank += 1
-
-        ##################Finish ADR##################
-        if current_rank == args['randomness_rank']+1:
-            is_stop = True
-           
-        all_meta_data = {'init_obj_poses': init_obj_poses, 'total_episodes': total_episodes, "best_success": best_success, "var_adr_light": var_adr_light,
-                         "var_adr_plate": var_adr_plate, "var_adr_object": var_adr_object, "is_var_adr": is_var_adr,  "is_stop": is_stop}
-
-    with open(meta_data_path,'wb') as file:
-        pickle.dump(all_meta_data, file)
-
-    return current_rank, is_stop
+    adr_dict["best_success"] = best_success
+   
+    return adr(args, current_rank, adr_dict)
 
 def main(args):
     
