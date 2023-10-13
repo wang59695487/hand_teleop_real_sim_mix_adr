@@ -35,6 +35,8 @@ def play_multiple_sim_visual(args):
     print('Replaying the sim demos and creating the dataset:')
     print('---------------------')
     init_obj_poses = []
+    lifted_chunks = []
+    chunks_sensitivity = []
     total = 0
     total_episodes = 0
     dataset_path = "{}/dataset.h5".format(args['out_folder'])
@@ -44,11 +46,13 @@ def play_multiple_sim_visual(args):
         print(file_name)
         with open(file_name, 'rb') as file:
             demo = pickle.load(file)
-            visual_baked, meta_data,info_success = play_one_real_sim_visual_demo(args=args,demo=demo)
+            visual_baked, meta_data, info_success, lifted_chunk, chunk_sensitivity = play_one_real_sim_visual_demo(args=args,demo=demo)
             if not info_success:
                 continue
             total += 1
             init_obj_poses.append(meta_data['env_kwargs']['init_obj_pos'])
+            chunks_sensitivity.append(chunk_sensitivity)
+            lifted_chunks.append(lifted_chunk)
         total_episodes, obs, action, robot_qpos  = stack_and_save_frames(visual_baked, total_episodes, args, file1)
 
     print('Fail sim demos:', len(demo_files) - total)
@@ -63,6 +67,8 @@ def play_multiple_sim_visual(args):
     print("Action dimension: {}".format(len(action)))
     meta_data_path = "{}/meta_data.pickle".format(dataset_folder)
     meta_data['init_obj_poses'] = init_obj_poses
+    meta_data['chunks_sensitivity'] = chunks_sensitivity
+    meta_data['lifted_chunks'] = lifted_chunks
     meta_data['num_img_aug'] = args['num_data_aug']
     meta_data['total_episodes'] = total_episodes
     file1.close()
@@ -159,8 +165,6 @@ def play_one_real_sim_visual_demo(args, demo, real_demo=None, real_images=None, 
     env_params['robot_name'] = robot_name
     env_params['use_visual_obs'] = use_visual_obs
     env_params['use_gui'] = False
-    env_params['object_name'] = args['object_name']
-    env_params['randomness_scale'] = 2
 
     # Specify rendering device if the computing device is given
     if "CUDA_VISIBLE_DEVICES" in os.environ:
@@ -329,6 +333,7 @@ def play_one_real_sim_visual_demo(args, demo, real_demo=None, real_images=None, 
 
     else:
         valid_frame = 0
+        lifted_chunk = 0
         stop_frame = 0
         for idx in tqdm(range(0,len(baked_data['obs']),frame_skip)):
             # NOTE: robot.get_qpos() version
@@ -342,6 +347,10 @@ def play_one_real_sim_visual_demo(args, demo, real_demo=None, real_images=None, 
                     continue
                 else:
                     valid_frame += 1
+                    
+                    if task_name == "pick_place":
+                        if env._is_object_lifted() and lifted_chunk == 0:
+                            lifted_chunk = int((valid_frame-1)/50)
 
                     ee_pose = ee_pose_next
                     hand_qpos_prev = hand_qpos 
@@ -384,9 +393,69 @@ def play_one_real_sim_visual_demo(args, demo, real_demo=None, real_images=None, 
                         stop_frame += 1
 
                     if stop_frame >= 30:
-                        break                       
+                        break
+       
+        chunk_sensitivity = []                        
+        if info_success:
+            # assign weights for action chunk 
+            total_frame = len(visual_baked['obs'])
+            for i in tqdm(range(total_frame//50)):
+                for var in [1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0]:
+                    valid_frame = 0
+                    env.reset()
+                    for idx in range(0,len(baked_data["obs"]),frame_skip):
+                        # NOTE: robot.get_qpos() version
+                        if idx < len(baked_data['obs'])-frame_skip:
+                        
+                            ee_pose_next = baked_data["ee_pose"][idx + frame_skip]
+                            ee_pose_delta = np.sqrt(np.sum((ee_pose_next[:3] - ee_pose[:3])**2))
+                            hand_qpos = baked_data["action"][idx][env.arm_dof:]
+                            delta_hand_qpos = hand_qpos - hand_qpos_prev if idx!=0 else hand_qpos
+                            
+                            if ee_pose_delta < 0.001 and np.mean(handqpos2angle(delta_hand_qpos)) <= 1.2:
+                                continue
+                            else:
+                                
+                                valid_frame += 1
+                                ee_pose = ee_pose_next
+                                hand_qpos_prev = hand_qpos
+                                
+                                palm_pose = env.ee_link.get_pose()
+                                palm_pose = robot_pose.inv() * palm_pose
 
-        return visual_baked, meta_data, info_success
+                                palm_next_pose = sapien.Pose(ee_pose_next[0:3], ee_pose_next[3:7])                            
+                                palm_next_pose = robot_pose.inv() * palm_next_pose
+                                
+                                palm_delta_pose = palm_pose.inv() * palm_next_pose
+                                delta_axis, delta_angle = transforms3d.quaternions.quat2axangle(palm_delta_pose.q)
+                                if delta_angle > np.pi:
+                                    delta_angle = 2 * np.pi - delta_angle
+                                    delta_axis = -delta_axis
+                                delta_axis_world = palm_pose.to_transformation_matrix()[:3, :3] @ delta_axis
+                                delta_pose = np.concatenate([palm_next_pose.p - palm_pose.p, delta_axis_world * delta_angle])
+                                ##############################Action Chunk Test#################################
+                                if valid_frame > i*50 and valid_frame <= (i+1)*50:
+                                    delta_pose = delta_pose*var
+                                    delta_hand_qpos = delta_hand_qpos*var
+                                    hand_qpos = hand_qpos_prev + delta_hand_qpos
+
+                                palm_jacobian = env.kinematic_model.compute_end_link_spatial_jacobian(env.robot.get_qpos()[:env.arm_dof])
+                                arm_qvel = compute_inverse_kinematics(delta_pose, palm_jacobian)[:env.arm_dof]
+                                arm_qpos = arm_qvel + env.robot.get_qpos()[:env.arm_dof]
+                        
+                                target_qpos = np.concatenate([arm_qpos, hand_qpos])
+            
+                                _, _, _, info = env.step(target_qpos)
+                                if task_name == 'pick_place':
+                                    info_success_weight = info["is_object_lifted"] and env._object_target_distance() <= 0.2 and env._is_object_plate_contact()    
+                                elif task_name == 'dclaw':
+                                    info_success_weight = info["success"]
+                    
+                    if not info_success_weight:
+                        chunk_sensitivity.append(var)
+                        break
+                      
+        return visual_baked, meta_data, info_success, lifted_chunk, chunk_sensitivity
 
 def stack_and_save_frames(visual_baked,total_episode, args, file1, using_real_data = False):
     # 0 menas sim, 1 means real here

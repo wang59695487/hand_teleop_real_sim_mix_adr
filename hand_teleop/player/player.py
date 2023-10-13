@@ -7,6 +7,7 @@ import transforms3d
 import pickle
 import os
 import imageio
+from tqdm import tqdm
 
 from hand_teleop.env.rl_env.base import BaseRLEnv, compute_inverse_kinematics
 from hand_teleop.env.rl_env.pen_draw_env import PenDrawRLEnv
@@ -32,37 +33,14 @@ def handqpos2angle(hand_qpos):
         delta_angles.append(np.abs(delta_angle))
     return delta_angles
 
-def compute_aug_qpos_through_ik(env, ee_pose_next, robot_pose):
-    palm_pose = env.ee_link.get_pose()
-    palm_pose = robot_pose.inv() * palm_pose
-    palm_next_pose = sapien.Pose(ee_pose_next[0:3], ee_pose_next[3:7])
-    palm_next_pose = robot_pose.inv() * palm_next_pose
-    palm_delta_pose = palm_pose.inv() * palm_next_pose
-    delta_axis, delta_angle = transforms3d.quaternions.quat2axangle(palm_delta_pose.q)
-    if delta_angle > np.pi:
-        delta_angle = 2 * np.pi - delta_angle
-        delta_axis = -delta_axis
-    delta_axis_world = palm_pose.to_transformation_matrix()[:3, :3] @ delta_axis
-    delta_pose = np.concatenate([palm_next_pose.p - palm_pose.p, delta_axis_world * delta_angle])
-
-    palm_jacobian = env.kinematic_model.compute_end_link_spatial_jacobian(env.robot.get_qpos()[:env.arm_dof])
-    arm_qvel = compute_inverse_kinematics(delta_pose, palm_jacobian)[:env.arm_dof]
-    arm_qpos = arm_qvel + env.robot.get_qpos()[:env.arm_dof]
-    hand_qpos = env.robot.get_qpos()[env.arm_dof:]
-    target_qpos = np.concatenate([arm_qpos, hand_qpos])
-    
-    return target_qpos
-
-def bake_visual_demonstration_test(retarget=False,idx=3):
-    from pathlib import Path
-
+def create_env(retarget=False,idx=3):
     # Recorder
-    shutil.rmtree('./temp/demos/player', ignore_errors=True)
-    os.makedirs('./temp/demos/player')
+    # shutil.rmtree('./temp/demos/player', ignore_errors=True)
+    # os.makedirs('./temp/demos/player')
     #path = f"./sim/raw_data/pick_place_mustard_bottle/mustard_bottle_{idx:004d}.pickle"
-    path = f"./sim/raw_data/dclaw/dclaw_3x_{idx:004d}.pickle"
+    #path = f"./sim/raw_data/dclaw/dclaw_3x_{idx:004d}.pickle"
     #path = "sim/raw_data/pick_place_tomato_soup_can/tomato_soup_can_0011.pickle"
-    #path = "sim/raw_data/pick_place_sugar_box/sugar_box_0040.pickle"
+    path = f"sim/raw_data/pick_place_sugar_box/sugar_box_{idx:004d}.pickle"
     all_data = np.load(path, allow_pickle=True)
     meta_data = all_data["meta_data"]
     task_name = meta_data["env_kwargs"]['task_name']
@@ -87,12 +65,8 @@ def bake_visual_demonstration_test(retarget=False,idx=3):
     env_params = meta_data["env_kwargs"]
     env_params['robot_name'] = robot_name
     env_params['use_visual_obs'] = use_visual_obs
-    env_params['use_gui'] = True
-    #env_params['object_name'] = "mustard_bottle"
-    #env_params['object_name'] = "tomato_soup_can"
-    env_params['object_name'] = "dclaw_3x"
-    env_params['randomness_scale'] = 2
-    print(env_params['object_scale'])
+    env_params['use_gui'] = False
+    
     if "CUDA_VISIBLE_DEVICES" in os.environ:
         env_params["device"] = "cuda"
     if robot_name == "mano":
@@ -130,11 +104,12 @@ def bake_visual_demonstration_test(retarget=False,idx=3):
                 else:
                     joint.set_drive_property(*(1 * finger_control_params), mode="force")
             env.rl_step = env.simple_sim_step
+    
     env.reset()
-    viewer = env.render()
-    env.viewer = viewer
-    viewer.set_camera_xyz(-0.6, 0.6, 0.6)
-    viewer.set_camera_rpy(0, -np.pi/6, np.pi/4)  
+    # viewer = env.render()
+    # env.viewer = viewer
+    # viewer.set_camera_xyz(-0.6, 0.6, 0.6)
+    # viewer.set_camera_rpy(0, -np.pi/6, np.pi/4)  
 
     real_camera_cfg = {"relocate_view": dict( pose=lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(224, 224))}
     
@@ -144,7 +119,6 @@ def bake_visual_demonstration_test(retarget=False,idx=3):
     empty_info = {}  # level empty dict for now, reserved for future
     camera_info = {"relocate_view": {"rgb": empty_info, "segmentation": empty_info}}
     env.setup_visual_obs_config(camera_info)
-
     # Player
     if task_name == 'pick_place':
         player = PickPlaceEnvPlayer(meta_data, data, env, zero_joint_pos=env_params["zero_joint_pos"])
@@ -164,7 +138,6 @@ def bake_visual_demonstration_test(retarget=False,idx=3):
     else:
         baked_data = player.bake_demonstration()
         
-    visual_baked = dict(obs=[], action=[])
     env.reset()
     player.scene.unpack(player.get_sim_data(0))
     
@@ -176,6 +149,12 @@ def bake_visual_demonstration_test(retarget=False,idx=3):
     env.robot.set_qpos(baked_data["robot_qpos"][0])
     if baked_data["robot_qvel"] != []:
         env.robot.set_qvel(baked_data["robot_qvel"][0])
+        
+    return env, task_name, meta_data, baked_data
+    
+def bake_visual_demonstration_test(retarget=False,demo_idx=3):
+    
+    env, task_name, meta_data, baked_data = create_env(retarget=retarget,idx=demo_idx)
 
     robot_pose = env.robot.get_pose()
     ee_pose = baked_data["ee_pose"][0]
@@ -185,9 +164,8 @@ def bake_visual_demonstration_test(retarget=False,idx=3):
     rgb_pics = []
    
     #################################Kinematic Augmentation####################################
-    init_pose_aug_dict = {"init_pose_aug_obj":sapien.Pose([-0.2,-0.2,0.0],[1,0,0,0]),
-                          "init_pose_aug_plate":sapien.Pose([0.0,0.0,0.0],[1,0,0,0]),
-                          "init_pose_aug_robot":sapien.Pose([0,0,0],[1,0,0,0])}
+    init_pose_aug_dict = {"init_pose_aug_obj":sapien.Pose([0,0,0],[1,0,0,0]),
+                          "init_pose_aug_plate":sapien.Pose([0,0,0],[1,0,0,0])}
     aug_step_plate = 400
     init_pose_aug_obj = init_pose_aug_dict['init_pose_aug_obj']
     meta_data["env_kwargs"]['init_obj_pos'] = init_pose_aug_obj * meta_data["env_kwargs"]['init_obj_pos']
@@ -204,16 +182,20 @@ def bake_visual_demonstration_test(retarget=False,idx=3):
         one_step_aug_obj = np.array([init_pose_aug_obj.p[0]/aug_step_obj, init_pose_aug_obj.p[0]/aug_step_obj])
         
     elif task_name == "dclaw":
-        aug_step_obj = 200
+        aug_step_obj = 50
         aug_obj = np.array([0,0])
-        init_pose_aug_robot = init_pose_aug_dict['init_pose_aug_robot']
-        ee_pose_aug = np.array([ee_pose[0]+init_pose_aug_robot.p[0],ee_pose[1]+init_pose_aug_robot.p[1]])
-        ee_pose_aug = np.concatenate([ee_pose_aug,ee_pose[2:]])
-        one_step_aug_obj =  np.array([(init_pose_aug_obj.p[0]-init_pose_aug_robot.p[0])/aug_step_obj, (init_pose_aug_obj.p[1]-init_pose_aug_robot.p[1])/aug_step_obj])
-        ##################Caulculate the new aug robot qpose##################
-        target_qpos = compute_aug_qpos_through_ik(env, ee_pose_aug, robot_pose)
-        env.robot.set_qpos(target_qpos) 
+        one_step_aug_obj =  np.array([(init_pose_aug_obj.p[0])/aug_step_obj, (init_pose_aug_obj.p[1])/aug_step_obj])
     
+    # # LIGHT AND TEXTURE RANDOMNESS
+    # env.random_map(2) ###hyper parameter
+    # ############## Add Texture Randomness ############
+    # env.generate_random_object_texture(2)
+    # ############## Add Light Randomness ############
+    # env.random_light(2)
+    # ############## Add Action Chunk ############   
+    valid_frame = 0
+    lifted_chunk = 0
+    visual_baked = dict(obs=[], action=[])
     for idx in range(0,len(baked_data["obs"]),frame_skip):
         # NOTE: robot.get_qpos() version
         if idx < len(baked_data['obs'])-frame_skip:
@@ -227,7 +209,7 @@ def bake_visual_demonstration_test(retarget=False,idx=3):
                 continue
 
             else:
-              
+                valid_frame += 1
                 ee_pose = ee_pose_next
                 hand_qpos_prev = hand_qpos
                 
@@ -236,21 +218,23 @@ def bake_visual_demonstration_test(retarget=False,idx=3):
 
                 if task_name == "pick_place":
                     if env._is_object_lifted():
+                        if lifted_chunk == 0:
+                            lifted_chunk = int((valid_frame-1)/50)
                         if aug_step_plate > 0:
                             aug_step_plate -= 1
                             aug_plate = aug_plate + one_step_aug_plate
                         palm_next_pose = sapien.Pose([aug_plate[0],aug_plate[1],0],[1,0,0,0])*sapien.Pose(ee_pose_next[0:3], ee_pose_next[3:7])
-                            
+                        
                     elif not env._is_object_lifted():
                         if aug_step_obj > 0:
                             aug_step_obj -= 1
                             aug_obj = aug_obj + one_step_aug_obj
                         palm_next_pose = sapien.Pose([aug_obj[0],aug_obj[1],0],[1,0,0,0])*sapien.Pose(ee_pose_next[0:3], ee_pose_next[3:7])
                         
-                elif task_name == "dclaw":
+                if task_name == "dclaw":
                     if aug_step_obj > 0:
-                        aug_step_obj -= 1
-                        aug_obj = aug_obj + one_step_aug_obj
+                            aug_step_obj -= 1
+                            aug_obj = aug_obj + one_step_aug_obj
                     palm_next_pose = sapien.Pose([aug_obj[0],aug_obj[1],0],[1,0,0,0])*sapien.Pose(ee_pose_next[0:3], ee_pose_next[3:7])
                 
                 palm_next_pose = robot_pose.inv() * palm_next_pose
@@ -270,15 +254,96 @@ def bake_visual_demonstration_test(retarget=False,idx=3):
                 visual_baked["obs"].append(env.get_observation())
                 visual_baked["action"].append(np.concatenate([delta_pose*100, hand_qpos]))
                 _, _, _, info = env.step(target_qpos)
-                env.render()
-                print(info['object_total_rotate_angle'])
-                rgb = env.get_observation()["relocate_view-rgb"].cpu().detach().numpy()
-                rgb_pic = (rgb * 255).astype(np.uint8)
-                rgb_pics.append(rgb_pic)
+                # env.render()
+                # print(info['object_total_rotate_angle'])
+                # rgb = env.get_observation()["relocate_view-rgb"].cpu().detach().numpy()
+                # rgb_pic = (rgb * 255).astype(np.uint8)
+                # rgb_pics.append(rgb_pic)
+                
+    # assign weights for action chunk 
+    total_frame = len(visual_baked['obs'])
+    chunk_sensitivity = []
+    for i in tqdm(range(total_frame//50)):
+        for var in [1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0]:
+            valid_frame = 0
+            visual_baked = dict(obs=[], action=[])
+            rgb_pics = []
+            env.reset()
+            for idx in range(0,len(baked_data["obs"]),frame_skip):
+                # NOTE: robot.get_qpos() version
+                if idx < len(baked_data['obs'])-frame_skip:
+                
+                    ee_pose_next = baked_data["ee_pose"][idx + frame_skip]
+                    ee_pose_delta = np.sqrt(np.sum((ee_pose_next[:3] - ee_pose[:3])**2))
+                    hand_qpos = baked_data["action"][idx][env.arm_dof:]
+                    delta_hand_qpos = hand_qpos - hand_qpos_prev if idx!=0 else hand_qpos
+                    
+                    if ee_pose_delta < 0.001 and np.mean(handqpos2angle(delta_hand_qpos)) <= 1.2:
+                        continue
+                    else:
+                        
+                        valid_frame += 1
+                        ee_pose = ee_pose_next
+                        hand_qpos_prev = hand_qpos
+                        
+                        palm_pose = env.ee_link.get_pose()
+                        palm_pose = robot_pose.inv() * palm_pose
 
+                        if task_name == "pick_place":
+                            if env._is_object_lifted():
+                                if aug_step_plate > 0:
+                                    aug_step_plate -= 1
+                                    aug_plate = aug_plate + one_step_aug_plate
+                                palm_next_pose = sapien.Pose([aug_plate[0],aug_plate[1],0],[1,0,0,0])*sapien.Pose(ee_pose_next[0:3], ee_pose_next[3:7])
+                                
+                            elif not env._is_object_lifted():
+                                if aug_step_obj > 0:
+                                    aug_step_obj -= 1
+                                    aug_obj = aug_obj + one_step_aug_obj
+                                palm_next_pose = sapien.Pose([aug_obj[0],aug_obj[1],0],[1,0,0,0])*sapien.Pose(ee_pose_next[0:3], ee_pose_next[3:7])
+                                
+                        if task_name == "dclaw":
+                            if aug_step_obj > 0:
+                                    aug_step_obj -= 1
+                                    aug_obj = aug_obj + one_step_aug_obj
+                            palm_next_pose = sapien.Pose([aug_obj[0],aug_obj[1],0],[1,0,0,0])*sapien.Pose(ee_pose_next[0:3], ee_pose_next[3:7])
+                        
+                        palm_next_pose = robot_pose.inv() * palm_next_pose
+                        palm_delta_pose = palm_pose.inv() * palm_next_pose
+                        delta_axis, delta_angle = transforms3d.quaternions.quat2axangle(palm_delta_pose.q)
+                        if delta_angle > np.pi:
+                            delta_angle = 2 * np.pi - delta_angle
+                            delta_axis = -delta_axis
+                        delta_axis_world = palm_pose.to_transformation_matrix()[:3, :3] @ delta_axis
+                        delta_pose = np.concatenate([palm_next_pose.p - palm_pose.p, delta_axis_world * delta_angle])
+                        ##############################Action Chunk Test#################################
+                        if valid_frame > i*50 and valid_frame <= (i+1)*50:
+                            delta_pose = delta_pose*var
+                            delta_hand_qpos = delta_hand_qpos*var
+                            hand_qpos = hand_qpos_prev + delta_hand_qpos
+                            rgb = env.get_observation()["relocate_view-rgb"].cpu().detach().numpy()
+                            rgb_pic = (rgb * 255).astype(np.uint8)
+                            rgb_pics.append(rgb_pic)
+
+
+                        palm_jacobian = env.kinematic_model.compute_end_link_spatial_jacobian(env.robot.get_qpos()[:env.arm_dof])
+                        arm_qvel = compute_inverse_kinematics(delta_pose, palm_jacobian)[:env.arm_dof]
+                        arm_qpos = arm_qvel + env.robot.get_qpos()[:env.arm_dof]
+                
+                        target_qpos = np.concatenate([arm_qpos, hand_qpos])
+                        visual_baked["obs"].append(env.get_observation())
+                        visual_baked["action"].append(np.concatenate([delta_pose*100, hand_qpos]))
+                        _, _, _, info = env.step(target_qpos)
+                        if task_name == 'pick_place':
+                            info_success = info["is_object_lifted"] and env._object_target_distance() <= 0.2 and env._is_object_plate_contact()    
+                        # env.render()
+                      
+            if not info_success:
+                imageio.mimsave(f"./temp/demos/player/relocate-rgb_domo{demo_idx}_chunk{i}_var{var}_{info_success}.mp4", rgb_pics, fps=120)
+                break
     # print("total_frames", len(visual_baked['obs']))
     # print("total_grasp_frames", len(rgb_pics))
-    imageio.mimsave("./temp/demos/player/relocate-rgb.mp4", rgb_pics, fps=120)
+    
 
 def bake_visual_real_demonstration_test(retarget=False):
     from pathlib import Path
@@ -540,5 +605,6 @@ if __name__ == '__main__':
     # bake_demonstration_svh_test()
     # bake_demonstration_ar10_test()
     # bake_demonstration_mano()
-    bake_visual_demonstration_test()
+    for i in range(1,51):
+        bake_visual_demonstration_test(retarget=False,demo_idx=i)
     # bake_visual_real_demonstration_test()
