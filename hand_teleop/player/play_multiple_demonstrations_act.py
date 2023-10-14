@@ -451,7 +451,7 @@ def play_one_real_sim_visual_demo(args, demo, real_demo=None, real_images=None, 
                                 elif task_name == 'dclaw':
                                     info_success_weight = info["success"]
                     
-                    if not info_success_weight:
+                    if not info_success_weight or var==2.0:
                         chunk_sensitivity.append(var)
                         break
                       
