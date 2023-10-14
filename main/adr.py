@@ -45,7 +45,7 @@ def aug_in_adr(args, current_rank, demo_files):
         ########### Add new sim demos to the original dataset ###########
         file1 = h5py.File(f"{args['sim_aug_dataset_folder']}/dataset.h5", 'a')
         for i in range(400):
-            for _ , file_name in enumerate(demo_files):
+            for demo_idx, file_name in enumerate(demo_files):
                 print(file_name)
                 if args['task_name'] == 'pick_place':
                     var_obj = var_adr_object if current_rank >= 4 else 0
@@ -71,9 +71,14 @@ def aug_in_adr(args, current_rank, demo_files):
                 with open(file_name, 'rb') as file:
                     demo = pickle.load(file)
                 all_data = copy.deepcopy(demo)
-
-                visual_baked, meta_data, info_success = generate_sim_aug_in_play_demo(args, demo=all_data, init_pose_aug_plate=init_pose_aug_plate , 
-                                                                                        init_pose_aug_obj=init_pose_aug_obj, var_adr_light=var_adr_light)
+                
+                if args['task_name'] == 'pick_place':
+                    lifted_chunk = all_meta_data['lifted_chunks'][demo_idx]
+                    chunk_sensitivity = all_meta_data['chunks_sensitivity'][demo_idx]
+                    
+                visual_baked, meta_data, info_success = generate_sim_aug_in_play_demo(args, demo=all_data, init_pose_aug_plate=init_pose_aug_plate, 
+                                                                                        init_pose_aug_obj=init_pose_aug_obj, var_adr_light=var_adr_light, 
+                                                                                        lifted_chunk=lifted_chunk,chunk_sensitivity=chunk_sensitivity)
                 if not info_success:
                     continue
                 aug[current_rank] -= 1
