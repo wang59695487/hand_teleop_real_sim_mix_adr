@@ -19,14 +19,14 @@ from hand_teleop.real_world import lab
 from hand_teleop.player.player import *
 
 def aug_in_non_sensitive_chunk(lifted_chunk, chunk_sensitivity):
+    aug_step_obj_length = 5 #hyperparameter
+    aug_step_plate_length = 6 #hyperparameter
     aug_obj_chunk = []
     aug_plate_chunk = []
-    for i in range(lifted_chunk):
-        if chunk_sensitivity[i] >= 1.5:
-            aug_obj_chunk.append(i)
-    for i in range(lifted_chunk+1,len(chunk_sensitivity)):
-        if chunk_sensitivity[i] >= 1.5:
-            aug_plate_chunk.append(i)
+    chunk_sensitivity_obj = np.argsort(-np.array(chunk_sensitivity[1:lifted_chunk]))
+    aug_obj_chunk = chunk_sensitivity_obj[:aug_step_obj_length]
+    chunk_sensitivity_plate = np.argsort(-np.array(chunk_sensitivity[lifted_chunk:len(chunk_sensitivity)]))
+    aug_plate_chunk = chunk_sensitivity_plate[:aug_step_plate_length]
     
     return aug_obj_chunk, aug_plate_chunk
 
@@ -149,7 +149,7 @@ def create_env(args, demo, retarget=False):
     
     return env, task_name, meta_data, baked_data
 
-def generate_sim_aug_in_play_demo(args, demo, init_pose_aug_plate, init_pose_aug_obj, var_adr_light, frame_skip=1, retarget=False, lifted_chunk=None, chunk_sensitivity=None):
+def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_plate, init_pose_aug_obj, var_adr_light, frame_skip=1, retarget=False):
 
     env, task_name, meta_data, baked_data = create_env(args, demo=demo, retarget=retarget)
     
@@ -162,9 +162,13 @@ def generate_sim_aug_in_play_demo(args, demo, init_pose_aug_plate, init_pose_aug
     
     #################################Kinematic Augmentation####################################
     if task_name == 'pick_place':
-        aug_obj_chunk, aug_plate_chunk = aug_in_non_sensitive_chunk(lifted_chunk, chunk_sensitivity)
-        aug_step_plate = len(aug_plate_chunk)*50
+        sensitive_chunk_file = f"{args['sim_dataset_folder']}/meta_data.pickle" 
+        with open(sensitive_chunk_file,'rb') as file:
+            sensitive_chunk_data = pickle.load(file)
+        aug_obj_chunk, aug_plate_chunk = aug_in_non_sensitive_chunk(sensitive_chunk_data['lifted_chunks'][demo_idx], 
+                                                                    chunk_sensitivity = sensitive_chunk_data['chunks_sensitivity'][demo_idx])
         aug_step_obj = len(aug_obj_chunk)*50
+        aug_step_plate = len(aug_plate_chunk)*50
         meta_data["env_kwargs"]['init_target_pos'] = init_pose_aug_plate * meta_data["env_kwargs"]['init_target_pos']
         env.plate.set_pose(meta_data["env_kwargs"]['init_target_pos'])
         aug_plate = np.array([init_pose_aug_obj.p[0],init_pose_aug_obj.p[1]])

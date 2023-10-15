@@ -35,8 +35,8 @@ def play_multiple_sim_visual(args):
     print('Replaying the sim demos and creating the dataset:')
     print('---------------------')
     init_obj_poses = []
-    lifted_chunks = []
-    chunks_sensitivity = []
+    lifted_chunks = {}
+    chunks_sensitivity = {}
     total = 0
     total_episodes = 0
     dataset_path = "{}/dataset.h5".format(args['out_folder'])
@@ -44,15 +44,16 @@ def play_multiple_sim_visual(args):
 
     for _, file_name in enumerate(demo_files):
         print(file_name)
+        demo_idx = file_name.split('/')[-1].split('.')[0]
         with open(file_name, 'rb') as file:
             demo = pickle.load(file)
             visual_baked, meta_data, info_success, lifted_chunk, chunk_sensitivity = play_one_real_sim_visual_demo(args=args,demo=demo)
+            chunks_sensitivity[demo_idx] = chunk_sensitivity
+            lifted_chunks[demo_idx] = lifted_chunk
             if not info_success:
                 continue
             total += 1
             init_obj_poses.append(meta_data['env_kwargs']['init_obj_pos'])
-            chunks_sensitivity.append(chunk_sensitivity)
-            lifted_chunks.append(lifted_chunk)
         total_episodes, obs, action, robot_qpos  = stack_and_save_frames(visual_baked, total_episodes, args, file1)
 
     print('Fail sim demos:', len(demo_files) - total)

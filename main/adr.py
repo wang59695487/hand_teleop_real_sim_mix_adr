@@ -45,8 +45,9 @@ def aug_in_adr(args, current_rank, demo_files):
         ########### Add new sim demos to the original dataset ###########
         file1 = h5py.File(f"{args['sim_aug_dataset_folder']}/dataset.h5", 'a')
         for i in range(400):
-            for demo_idx, file_name in enumerate(demo_files):
+            for _, file_name in enumerate(demo_files):
                 print(file_name)
+                demo_idx = file_name.split('/')[-1].split('.')[0]
                 if args['task_name'] == 'pick_place':
                     var_obj = var_adr_object if current_rank >= 4 else 0
                     x1, y1 = np.random.uniform(-0.02-var_obj,0.02+var_obj,2)        
@@ -72,13 +73,8 @@ def aug_in_adr(args, current_rank, demo_files):
                     demo = pickle.load(file)
                 all_data = copy.deepcopy(demo)
                 
-                if args['task_name'] == 'pick_place':
-                    lifted_chunk = all_meta_data['lifted_chunks'][demo_idx]
-                    chunk_sensitivity = all_meta_data['chunks_sensitivity'][demo_idx]
-                    
-                visual_baked, meta_data, info_success = generate_sim_aug_in_play_demo(args, demo=all_data, init_pose_aug_plate=init_pose_aug_plate, 
-                                                                                        init_pose_aug_obj=init_pose_aug_obj, var_adr_light=var_adr_light, 
-                                                                                        lifted_chunk=lifted_chunk,chunk_sensitivity=chunk_sensitivity)
+                visual_baked, meta_data, info_success = generate_sim_aug_in_play_demo(args, demo=all_data, demo_idx=demo_idx, init_pose_aug_plate=init_pose_aug_plate, 
+                                                                                        init_pose_aug_obj=init_pose_aug_obj, var_adr_light=var_adr_light)
                 if not info_success:
                     continue
                 aug[current_rank] -= 1
