@@ -73,6 +73,7 @@ def get_args_parser():
     parser.add_argument("--finetune", action="store_true")
     parser.add_argument("--task-name", default="pick_place", type=str)
     parser.add_argument("--dann", action="store_true")
+    parser.add_argument("--domain_weight", default=20, type=float)
 
     return parser
 
@@ -120,6 +121,7 @@ class ACTPolicy(nn.Module):
         self.model = model # CVAE decoder
         self.optimizer = optimizer
         self.kl_weight = args_override['kl_weight']
+        self.domain_weight = args_override['domain_weight']
         self.dann = args_override['dann']
         print(f'KL Weight {self.kl_weight}')
 
@@ -144,7 +146,7 @@ class ACTPolicy(nn.Module):
             loss_dict['kl'] = total_kld[0]
             if self.dann:
                 loss_dict['domain'] = domain_loss
-                loss_dict['loss'] = loss_dict['l1'] + loss_dict['kl'] * self.kl_weight + loss_dict['domain']
+                loss_dict['loss'] = loss_dict['l1'] + loss_dict['kl'] * self.kl_weight + loss_dict['domain'] * self.domain_weight 
             else:
                 loss_dict['loss'] = loss_dict['l1'] + loss_dict['kl'] * self.kl_weight
             return loss_dict
@@ -173,7 +175,8 @@ class ActAgent(object):
                          'enc_layers': enc_layers,
                          'dec_layers': dec_layers,
                          'nheads': nheads,
-                         'dann': args['dann']
+                         'dann': args['dann'],
+                         'domain_weight': args['domain_weight']
                          }
 
         set_seed(args['seed'])

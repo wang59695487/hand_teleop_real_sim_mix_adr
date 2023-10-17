@@ -207,6 +207,7 @@ def parse_args():
     parser.add_argument("--randomness-rank", default=2, type=int)
     parser.add_argument("--task-name", default="pick_place", type=str)
     parser.add_argument("--dann", action="store_true")
+    parser.add_argument("--domain_weight", default=20, type=float)
     
     args = parser.parse_args()
 
@@ -241,6 +242,7 @@ if __name__ == '__main__':
         "eval_only": args.eval_only,
         "finetune": args.finetune,
         "dann": args.dann,
+        'domain_weight': args.domain_weight,
         "randomness_rank": args.randomness_rank,
         "ckpt": args.ckpt,
         "task_name": args.task_name,
