@@ -72,6 +72,7 @@ def get_args_parser():
     parser.add_argument("--randomness-rank", default=1, type=int)
     parser.add_argument("--finetune", action="store_true")
     parser.add_argument("--task-name", default="pick_place", type=str)
+    parser.add_argument("--dann", action="store_true")
 
     return parser
 
@@ -119,25 +120,33 @@ class ACTPolicy(nn.Module):
         self.model = model # CVAE decoder
         self.optimizer = optimizer
         self.kl_weight = args_override['kl_weight']
+        self.dann = args_override['dann']
         print(f'KL Weight {self.kl_weight}')
 
-    def __call__(self, obs, qpos, actions=None, is_pad=None):
+    def __call__(self, obs, qpos, actions=None, is_pad=None, sim_real_label=None):
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                          std=[0.229, 0.224, 0.225])
         obs = normalize(obs)
-
+        
         if actions is not None: # training time
             actions = actions[:, :self.model.num_queries]
             is_pad = is_pad[:, :self.model.num_queries]
-
-            a_hat, is_pad_hat, (mu, logvar) = self.model(obs, qpos, actions, is_pad)
+            if self.dann:
+                a_hat, is_pad_hat, (mu, logvar), domain_logits = self.model(obs, qpos, actions, is_pad)
+                domain_loss=F.binary_cross_entropy(domain_logits, sim_real_label)
+            else:    
+                a_hat, is_pad_hat, (mu, logvar) = self.model(obs, qpos, actions, is_pad)
             total_kld, dim_wise_kld, mean_kld = kl_divergence(mu, logvar)
             loss_dict = dict()
             all_l1 = F.l1_loss(actions, a_hat, reduction='none')
             l1 = (all_l1 * ~is_pad.unsqueeze(-1)).mean()
             loss_dict['l1'] = l1
             loss_dict['kl'] = total_kld[0]
-            loss_dict['loss'] = loss_dict['l1'] + loss_dict['kl'] * self.kl_weight
+            if self.dann:
+                loss_dict['domain'] = domain_loss
+                loss_dict['loss'] = loss_dict['l1'] + loss_dict['kl'] * self.kl_weight + loss_dict['domain']
+            else:
+                loss_dict['loss'] = loss_dict['l1'] + loss_dict['kl'] * self.kl_weight
             return loss_dict
 
         else: # inference time
@@ -164,6 +173,7 @@ class ActAgent(object):
                          'enc_layers': enc_layers,
                          'dec_layers': dec_layers,
                          'nheads': nheads,
+                         'dann': args['dann']
                          }
 
         set_seed(args['seed'])
@@ -171,8 +181,8 @@ class ActAgent(object):
         self.policy.cuda()
         self.optimizer = self.policy.configure_optimizers()
    
-    def compute_loss(self, obs, qpos, actions, is_pad):
-        loss_dict = self.policy(obs, qpos, actions, is_pad)
+    def compute_loss(self, obs, qpos, actions, is_pad, sim_real_label):
+        loss_dict = self.policy(obs, qpos, actions, is_pad, sim_real_label)
         return loss_dict
     
     def update_policy(self, loss):
@@ -206,63 +216,35 @@ class ActAgent(object):
         self.policy.load_state_dict(act_network_checkpoint['act_network_state_dict'])
         args = act_network_checkpoint['args']       
         return args
-
-    def adr(self, weight_path, lr, rank):
-        act_network_checkpoint = torch.load(weight_path)
-        self.policy.load_state_dict(act_network_checkpoint['act_network_state_dict'])
-        
-        if rank == 2:
-            for name, param in self.policy.model.named_parameters():
-                param.requires_grad = False
-
-            for param in self.policy.model.encoder.parameters():
-                if param.dim() > 1:
-                    nn.init.xavier_uniform_(param)
-                    param.requires_grad = True
-        
-            for param in self.policy.model.backbones.parameters():
-                if param.dim() > 1:
-                    nn.init.xavier_uniform_(param)
-                    param.requires_grad = True
             
-            for name, param in self.policy.model.named_parameters():
-                if "encoder_obs" in name:
-                    if param.dim() > 1:
-                        nn.init.xavier_uniform_(param)
-                    param.requires_grad = True
-
-            ##############Initialize optimizer and BatchNorm##################
-            pg = [p for _ , p in self.policy.model.named_parameters() if p.requires_grad]
-            self.optimizer = torch.optim.AdamW(pg, lr=lr)
-            
-    def finetune(self, args):
-        act_network_checkpoint = torch.load(args["ckpt"])
-        self.policy.load_state_dict(act_network_checkpoint['act_network_state_dict'])
+    # def finetune(self, args):
+    #     act_network_checkpoint = torch.load(args["ckpt"])
+    #     self.policy.load_state_dict(act_network_checkpoint['act_network_state_dict'])
         
-        for name, param in self.policy.model.named_parameters():
-            param.requires_grad = False
+    #     for name, param in self.policy.model.named_parameters():
+    #         param.requires_grad = False
        
-        for param in self.policy.model.encoder.parameters():
-            if param.dim() > 1:
-                nn.init.xavier_uniform_(param)
-                param.requires_grad = True
+    #     for param in self.policy.model.encoder.parameters():
+    #         if param.dim() > 1:
+    #             #nn.init.xavier_uniform_(param)
+    #             param.requires_grad = True
         
-        for param in self.policy.model.backbones.parameters():
-            if param.dim() > 1:
-                nn.init.xavier_uniform_(param)
-                param.requires_grad = True
+    #     for param in self.policy.model.backbones.parameters():
+    #         if param.dim() > 1:
+    #             #nn.init.xavier_uniform_(param)
+    #             param.requires_grad = True
             
-        for name, param in self.policy.model.named_parameters():
-            if "encoder_obs" in name:
-                if param.dim() > 1:
-                    nn.init.xavier_uniform_(param)
-                param.requires_grad = True
+    #     for name, param in self.policy.model.named_parameters():
+    #         if "encoder_obs" in name:
+    #             if param.dim() > 1:
+    #                 #nn.init.xavier_uniform_(param)
+    #                 param.requires_grad = True
 
-        ##############Initialize optimizer and BatchNorm##################
-        pg = [p for _ , p in self.policy.model.named_parameters() if p.requires_grad]
-        self.optimizer = torch.optim.AdamW(pg, lr=args['lr'], weight_decay=args['weight_decay'])
-        args = act_network_checkpoint['args']       
-        return args
+    #     ##############Initialize optimizer and BatchNorm##################
+    #     pg = [p for _ , p in self.policy.model.named_parameters() if p.requires_grad]
+    #     self.optimizer = torch.optim.AdamW(pg, lr=args['lr'], weight_decay=args['weight_decay'])
+    #     args = act_network_checkpoint['args']       
+    #     return args
     
         
         

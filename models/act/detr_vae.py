@@ -5,7 +5,7 @@ DETR model and criterion classes.
 import torch
 from torch import nn
 import torch.nn.functional as F
-from torch.autograd import Variable
+from torch.autograd import Function, Variable
 from .backbone import build_backbone
 from .transformer import build_transformer, TransformerEncoder, TransformerEncoderLayer
 
@@ -31,10 +31,34 @@ def get_sinusoid_encoding_table(n_position, d_hid):
 
     return torch.FloatTensor(sinusoid_table).unsqueeze(0)
 
+class GradientReversalFunc(Function):
+    @staticmethod
+    def forward(ctx, x, alpha):
+        ctx.save_for_backward(x, alpha)
+        return x
+    
+    @staticmethod
+    def backward(ctx, grad_output):
+        grad_input = None
+        _, alpha = ctx.saved_tensors
+        if ctx.needs_input_grad[0]:
+            grad_input = - alpha*grad_output
+        return grad_input, None
+    
+revgrad = GradientReversalFunc.apply
+
+class GradientReversalLayer(nn.Module):
+    def __init__(self, alpha=1):
+        super().__init__()
+        self.alpha = torch.tensor(alpha, requires_grad=False)
+
+    def forward(self, x):
+        return revgrad(x, self.alpha)
+    
 
 class DETRVAE(nn.Module):
     """ This is the DETR module that performs object detection """
-    def __init__(self, backbones, transformer, encoder, action_dim, num_queries):
+    def __init__(self, backbones, transformer, encoder, action_dim, num_queries, dann):
         """ Initializes the model.
         Parameters:
             backbones: torch module of the backbone to be used. See backbone.py
@@ -74,6 +98,20 @@ class DETRVAE(nn.Module):
         # decoder extra parameters
         self.latent_out_proj = nn.Linear(self.latent_dim, hidden_dim) # project latent sample to embedding
         self.additional_pos_embed = nn.Embedding(2, hidden_dim) # learned position embedding for proprio and latent
+
+        #Add DANN
+        self.dann = dann
+        if self.dann:
+            self.domain_clf = nn.Sequential(
+                GradientReversalLayer(),
+                nn.Linear(256*7*7, hidden_dim),
+                nn.BatchNorm1d(hidden_dim),
+                nn.ReLU(),
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.BatchNorm1d(hidden_dim),
+                nn.ReLU(),
+                nn.Linear(hidden_dim, 1),
+            )
 
     def forward(self, image, qpos, actions=None, is_pad=None):
         """
@@ -138,6 +176,14 @@ class DETRVAE(nn.Module):
 
         a_hat = self.action_head(hs)
         is_pad_hat = self.is_pad_head(hs)
+        
+        if self.dann and is_training:
+            src = src.flatten(1)
+            domain_logits = self.domain_clf(src)
+            domain_logits = domain_logits.view(bs, 1)
+            domain_logits = torch.sigmoid(domain_logits)
+            return a_hat, is_pad_hat, [mu, logvar], domain_logits
+
         return a_hat, is_pad_hat, [mu, logvar]
 
 def build_encoder(args):
@@ -177,6 +223,7 @@ def build_ACT_model(args):
         encoder,
         action_dim=action_dim,
         num_queries=args.num_queries,
+        dann = args.dann
     )
 
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)

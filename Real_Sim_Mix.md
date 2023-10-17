@@ -3,7 +3,7 @@
 
 ################################Mustard Bottle##########################################
 #real demo: 58150   kinematic aug: 0
-nohup python hand_teleop/player/play_multiple_demonstrations_act.py --backbone-type=regnet_y_3_2gf --real-folder=real/raw_data/pick_place_mustard_bottle_large_scale --out-folder=real/baked_data/pick_place_mb_large_scale --task-name=pick_place --object-name=mustard_bottle --frame-skip=1 --real-delta-ee-pose-bound=0.001 --light-mode=default --img-data-aug=1  --kinematic-aug=0  > logs/play_sim 2>&1 & 
+nohup python hand_teleop/player/play_multiple_demonstrations_act.py --backbone-type=regnet_y_3_2gf --real-folder=real/raw_data/pick_place_mustard_bottle_large_scale --out-folder=real/baked_data/pick_place_mb_large_scale --task-name=pick_place --object-name=mustard_bottle --frame-skip=1 --real-delta-ee-pose-bound=0.001 --img-data-aug=1 --chunk-size=50 > logs/play_sim 2>&1 & 
 
 nohup python main/train_act.py \
     --real-demo-folder=real/baked_data/pick_place_mb_large_scale \
@@ -58,7 +58,7 @@ nohup python main/train_act.py \
 
 ################################Sugar Box##########################################
 #real demo: 33640   kinematic aug: 0
-nohup python hand_teleop/player/play_multiple_demonstrations_act.py --backbone-type=regnet_y_3_2gf --real-folder=real/raw_data/pick_place_sugar_box --out-folder=real/baked_data/pick_place_sg --task-name=pick_place --object-name=sugar_box --frame-skip=1 --real-delta-ee-pose-bound=0.001 --light-mode=default --img-data-aug=5  --kinematic-aug=0  > logs/play_sim 2>&1 & 
+nohup python hand_teleop/player/play_multiple_demonstrations_act.py --backbone-type=regnet_y_3_2gf --real-folder=real/raw_data/pick_place_sugar_box --out-folder=real/baked_data/pick_place_sg --task-name=pick_place --object-name=sugar_box --frame-skip=1 --real-delta-ee-pose-bound=0.001 --img-data-aug=1 --chunk-size=50 > logs/play_sim 2>&1 & 
 
 nohup python main/train_act.py \
     --real-demo-folder=real/baked_data/pick_place_sg \

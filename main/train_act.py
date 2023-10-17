@@ -27,7 +27,7 @@ def evaluate(agent, validation_loader, L, epoch):
     with torch.inference_mode():
         agent.policy.eval()
         for iter, data_batch in enumerate(validation_loader):
-            obs, robot_qpos, action, label, is_pad = data_batch
+            obs, robot_qpos, action, label, is_pad, _ = data_batch
             obs, robot_qpos, action, label, is_pad = obs.cuda(), robot_qpos.cuda(), action.cuda(), label.cuda(), is_pad.cuda()
             loss = agent.evaluate(obs, robot_qpos, action, is_pad)
             loss_val += loss
@@ -40,14 +40,15 @@ def evaluate(agent, validation_loader, L, epoch):
 def compute_loss(agent, bc_train_dataloader, L, epoch):
 
     data_batch = next(iter(bc_train_dataloader))
-    obs, robot_qpos, action, label, is_pad = data_batch
-    obs, robot_qpos, action, label, is_pad = obs.cuda(), robot_qpos.cuda(), action.cuda(), label.cuda(), is_pad.cuda()
-    loss_dict = agent.compute_loss(obs, robot_qpos, action, is_pad)
+    obs, robot_qpos, action, label, is_pad, sim_real_label = data_batch
+    obs, robot_qpos, action, label, is_pad, sim_real_label = obs.cuda(), robot_qpos.cuda(), action.cuda(), label.cuda(), is_pad.cuda(), sim_real_label.cuda()
+    loss_dict = agent.compute_loss(obs, robot_qpos, action, is_pad, sim_real_label)
     l1_loss = loss_dict['l1']
     kl_loss = loss_dict['kl']
+    domain_loss = loss_dict['domain']
     loss = loss_dict['loss']
 
-    return l1_loss,kl_loss,loss
+    return l1_loss,kl_loss,domain_loss,loss
 
 def train_real_sim_in_one_epoch(agent, sim_real_ratio, it_per_epoch_real, it_per_epoch_sim, bc_train_dataloader_real, 
                                 bc_validation_dataloader_real, bc_train_dataloader_sim, bc_validation_dataloader_sim, L, epoch):
@@ -88,23 +89,25 @@ def train_real_sim_in_one_epoch(agent, sim_real_ratio, it_per_epoch_real, it_per
     
     return loss_real_sim_mix
 
-def train_in_one_epoch(agent, it_per_epoch, bc_train_dataloader, bc_validation_dataloader, L, epoch):
+def train_in_one_epoch(agent, it_per_epoch, bc_train_dataloader, bc_validation_dataloader, L, epoch, sim_real_ratio=1):
     
     loss_train = 0
     loss_train_l1 = 0
     loss_train_kl = 0
+    loss_train_domain = 0
     for _ in tqdm(range(it_per_epoch)):
 
-        l1_loss, kl_loss, act_loss = compute_loss(agent,bc_train_dataloader,L,epoch)
-        loss = agent.update_policy(act_loss)
+        l1_loss, kl_loss,domain_loss, act_loss = compute_loss(agent,bc_train_dataloader,L,epoch)
+        loss = agent.update_policy(act_loss*sim_real_ratio)
         loss_train += loss
         loss_train_l1 += l1_loss.detach().cpu().item()
         loss_train_kl += kl_loss.detach().cpu().item()
+        loss_train_domain += domain_loss.detach().cpu().item()
 
     loss_val = evaluate(agent, bc_validation_dataloader, L, epoch)
     agent.policy.train()
 
-    return loss_train/(it_per_epoch),loss_train_l1/(it_per_epoch), loss_train_kl/(it_per_epoch), loss_val
+    return loss_train/(it_per_epoch),loss_train_l1/(it_per_epoch), loss_train_kl/(it_per_epoch),loss_train_domain/(it_per_epoch), loss_val
 
 def main(args):
     # read and prepare data
@@ -223,6 +226,7 @@ def main(args):
             wandb.finish()
 
     else:
+        best_loss = 1
         agent.finetune(args)
         print("##########################Finetune##################################")
         cur_time = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -230,7 +234,7 @@ def main(args):
         log_dir = os.path.join("logs", f"{args['ckpt'].split('/')[-2]}_Finetuning_{args['backbone_type']}_{cur_time}")
         
         wandb.init(
-            project="hand-teleop",
+            project="hand-teleop-adr-rank",
             name=os.path.basename(log_dir),
             config=args
         )
@@ -246,14 +250,16 @@ def main(args):
             metrics = {
                 "loss/train": loss_train,
                 "loss/train_l1": loss_l1,
-                "loss/train_kl": loss_kl,
+                "loss/train_kl": loss_kl*args['kl_weight'],
                 "loss/val": loss_val,
                 "epoch": epoch
             }
             
             wandb.log(metrics)
-            if (epoch + 1) % args["eval_freq"] == 0 and (epoch+1) >= args["eval_start_epoch"]:
-                agent.save(os.path.join(log_dir, f"epoch_{epoch + 1}.pt"), args)
+            if (epoch+1) >= args["eval_start_epoch"]:
+                if loss_l1 < best_loss:
+                    best_loss = loss_l1
+                    agent.save(os.path.join(log_dir, f"epoch_best.pt"), args)
 
         wandb.finish()
         
@@ -279,6 +285,7 @@ def parse_args():
     parser.add_argument("--hidden_dim", default=256, type=int)
     parser.add_argument("--val-ratio", default=0.1, type=float)
     parser.add_argument("--randomness-rank", default=1, type=int)
+    parser.add_argument("--dann", action="store_true")
     
     args = parser.parse_args()
 

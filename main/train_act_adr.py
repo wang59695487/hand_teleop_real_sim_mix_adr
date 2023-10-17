@@ -15,7 +15,7 @@ from main.policy.act_agent import ActAgent
 from eval_act import Eval_player
 from adr import adr, aug_in_adr
 from logger import Logger
-from dataset.act_dataset import argument_dependecy_checker, prepare_sim_aug_data, set_seed
+from dataset.act_dataset import argument_dependecy_checker, prepare_sim_aug_data, prepare_real_data, set_seed
 from main.train_act import train_in_one_epoch
 
 
@@ -27,14 +27,18 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
        
     sim_aug_demo_length, sim_aug_path, adr_dict = aug_in_adr(args, current_rank, demo_files)
    
-    Prepared_Data = prepare_sim_aug_data(sim_dataset_folder=args['sim_dataset_folder'],sim_dataset_aug_folder=sim_aug_path, sim_aug_demo_length=sim_aug_demo_length, sim_batch_size=args['sim_batch_size'],
+    Prepared_Data_Sim = prepare_sim_aug_data(sim_dataset_folder=args['sim_dataset_folder'],sim_dataset_aug_folder=sim_aug_path, sim_aug_demo_length=sim_aug_demo_length, sim_batch_size=args['sim_batch_size'],
                                  val_ratio=args['val_ratio'], seed = 20230920, chunk_size=args['num_queries'])
-    
+    Prepared_Data_Real = prepare_real_data(args['real_dataset_folder'], args['real_batch_size'])
+
+    sim_real_ratio = Prepared_Data_Sim['total_episodes'] / Prepared_Data_Real['total_episodes']
+
     print('Data prepared')
     print('---------------------')
-    print("Concatenated Observation (State + Visual Obs) Shape: {}".format(len(Prepared_Data['bc_train_set'].dummy_data['obs'])))
-    print("Action shape: {}".format(len(Prepared_Data['bc_train_set'].dummy_data['action'])))
-    print("robot_qpos shape: {}".format(len(Prepared_Data['bc_train_set'].dummy_data['robot_qpos'])))
+    print("Concatenated Observation (State + Visual Obs) Shape: {}".format(len(Prepared_Data_Sim['bc_train_set'].dummy_data['obs'])))
+    print("Action shape: {}".format(len(Prepared_Data_Sim['bc_train_set'].dummy_data['action'])))
+    print("robot_qpos shape: {}".format(len(Prepared_Data_Sim['bc_train_set'].dummy_data['robot_qpos'])))
+    print("Sim_Real_Ratio: {}".format(sim_real_ratio))
     
     # make agent
     agent = ActAgent(args)
@@ -59,13 +63,21 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
     for epoch in range(epochs):
         print('  ','Epoch: ', epoch)
         agent.policy.train()
-        loss_train,loss_l1,loss_kl, loss_val = train_in_one_epoch(agent, Prepared_Data['it_per_epoch'], Prepared_Data['bc_train_dataloader'], 
-                                                Prepared_Data['bc_validation_dataloader'], L, epoch)
+        loss_train_sim,loss_l1_sim,loss_kl_sim, loss_train_domain_sim, loss_val_sim = train_in_one_epoch(agent, Prepared_Data_Sim['it_per_epoch'], Prepared_Data_Sim['bc_train_dataloader'], 
+                                                Prepared_Data_Sim['bc_validation_dataloader'], L, epoch)
+        loss_train_real,loss_l1_real,loss_kl_real,loss_train_domain_real, loss_val_real = train_in_one_epoch(agent, Prepared_Data_Real['it_per_epoch'], Prepared_Data_Real['bc_train_dataloader'], 
+                                                Prepared_Data_Real['bc_validation_dataloader'], L, epoch, sim_real_ratio)
         metrics = {
-            "loss/train": loss_train,
-            "loss/train_l1": loss_l1,
-            "loss/train_kl": loss_kl*args['kl_weight'],
-            "loss/val": loss_val,
+            "loss/train_sim": loss_train_sim,
+            "loss/train_l1_sim": loss_l1_sim,
+            "loss/train_kl_sim": loss_kl_sim*args['kl_weight'],
+            "loss/train_domain_sim": loss_train_domain_sim,
+            "loss/val_sim": loss_val_sim,
+            "loss/train_real": loss_train_real,
+            "loss/train_l1_real": loss_l1_real,
+            "loss/train_kl_real": loss_kl_real*args['kl_weight'],
+            "loss/train_domain_real": loss_train_domain_real,
+            "loss/val_real": loss_val_real,
             "epoch": epoch,
             "current_rank": current_rank
         }
@@ -173,6 +185,7 @@ def main(args):
 
 def parse_args():
     parser = ArgumentParser()
+    parser.add_argument("--real-demo-folder", default=None, type=str)
     parser.add_argument("--sim-folder", default=None)
     parser.add_argument("--sim-demo-folder", default=None, type=str)
     parser.add_argument("--sim-aug-dataset-folder", default=None, type=str)
@@ -193,6 +206,7 @@ def parse_args():
     parser.add_argument("--val-ratio", default=0.1, type=float)
     parser.add_argument("--randomness-rank", default=2, type=int)
     parser.add_argument("--task-name", default="pick_place", type=str)
+    parser.add_argument("--dann", action="store_true")
     
     args = parser.parse_args()
 
@@ -203,6 +217,7 @@ if __name__ == '__main__':
     args = parse_args()
 
     args = {
+        'real_dataset_folder': args.real_demo_folder,
         'sim_dataset_folder': args.sim_demo_folder,
         "sim_demo_folder": args.sim_folder,
         'sim_aug_dataset_folder': args.sim_aug_dataset_folder,
@@ -225,10 +240,11 @@ if __name__ == '__main__':
         "eval_freq": args.eval_freq,
         "eval_only": args.eval_only,
         "finetune": args.finetune,
+        "dann": args.dann,
         "randomness_rank": args.randomness_rank,
         "ckpt": args.ckpt,
         "task_name": args.task_name,
-        "seed": 20230930
+        "seed": 20231014
     }
     args = argument_dependecy_checker(args)
 
