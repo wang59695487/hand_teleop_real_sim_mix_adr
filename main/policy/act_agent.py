@@ -220,34 +220,34 @@ class ActAgent(object):
         args = act_network_checkpoint['args']       
         return args
             
-    # def finetune(self, args):
-    #     act_network_checkpoint = torch.load(args["ckpt"])
-    #     self.policy.load_state_dict(act_network_checkpoint['act_network_state_dict'])
+    def finetune(self, args):
+        act_network_checkpoint = torch.load(args["ckpt"])
+        self.policy.load_state_dict(act_network_checkpoint['act_network_state_dict'])
         
-    #     for name, param in self.policy.model.named_parameters():
-    #         param.requires_grad = False
+        # for name, param in self.policy.model.named_parameters():
+        #     param.requires_grad = False
        
-    #     for param in self.policy.model.encoder.parameters():
-    #         if param.dim() > 1:
-    #             #nn.init.xavier_uniform_(param)
-    #             param.requires_grad = True
+        # for param in self.policy.model.encoder.parameters():
+        #     if param.dim() > 1:
+        #         #nn.init.xavier_uniform_(param)
+        #         param.requires_grad = True
         
-    #     for param in self.policy.model.backbones.parameters():
-    #         if param.dim() > 1:
-    #             #nn.init.xavier_uniform_(param)
-    #             param.requires_grad = True
+        # for param in self.policy.model.backbones.parameters():
+        #     if param.dim() > 1:
+        #         #nn.init.xavier_uniform_(param)
+        #         param.requires_grad = True
             
-    #     for name, param in self.policy.model.named_parameters():
-    #         if "encoder_obs" in name:
-    #             if param.dim() > 1:
-    #                 #nn.init.xavier_uniform_(param)
-    #                 param.requires_grad = True
+        # for name, param in self.policy.model.named_parameters():
+        #     if "encoder_obs" in name:
+        #         if param.dim() > 1:
+        #             #nn.init.xavier_uniform_(param)
+        #             param.requires_grad = True
 
-    #     ##############Initialize optimizer and BatchNorm##################
-    #     pg = [p for _ , p in self.policy.model.named_parameters() if p.requires_grad]
-    #     self.optimizer = torch.optim.AdamW(pg, lr=args['lr'], weight_decay=args['weight_decay'])
-    #     args = act_network_checkpoint['args']       
-    #     return args
+        ##############Initialize optimizer and BatchNorm##################
+        pg = [p for _ , p in self.policy.model.named_parameters() if p.requires_grad]
+        self.optimizer = torch.optim.AdamW(pg, lr=args['lr'], weight_decay=args['weight_decay'])
+        args = act_network_checkpoint['args']       
+        return args
     
         
         

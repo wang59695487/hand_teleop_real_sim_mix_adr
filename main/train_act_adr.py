@@ -15,7 +15,7 @@ from main.policy.act_agent import ActAgent
 from eval_act import Eval_player
 from adr import adr, aug_in_adr
 from logger import Logger
-from dataset.act_dataset import argument_dependecy_checker, prepare_sim_aug_data, prepare_real_data, set_seed
+from dataset.act_dataset import argument_dependecy_checker, prepare_sim_aug_data, set_seed
 from main.train_act import train_in_one_epoch
 
 
@@ -27,18 +27,14 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
        
     sim_aug_demo_length, sim_aug_path, adr_dict = aug_in_adr(args, current_rank, demo_files)
    
-    Prepared_Data_Sim = prepare_sim_aug_data(sim_dataset_folder=args['sim_dataset_folder'],sim_dataset_aug_folder=sim_aug_path, sim_aug_demo_length=sim_aug_demo_length, sim_batch_size=args['sim_batch_size'],
+    Prepared_Data_Sim = prepare_sim_aug_data(real_dataset_folder=args['real_dataset_folder'], sim_dataset_folder=args['sim_dataset_folder'],sim_dataset_aug_folder=sim_aug_path, sim_aug_demo_length=sim_aug_demo_length, sim_batch_size=args['sim_batch_size'],
                                  val_ratio=args['val_ratio'], seed = 20230920, chunk_size=args['num_queries'])
-    Prepared_Data_Real = prepare_real_data(args['real_dataset_folder'], args['real_batch_size'])
-
-    sim_real_ratio = Prepared_Data_Sim['total_episodes'] / Prepared_Data_Real['total_episodes']
 
     print('Data prepared')
     print('---------------------')
     print("Concatenated Observation (State + Visual Obs) Shape: {}".format(len(Prepared_Data_Sim['bc_train_set'].dummy_data['obs'])))
     print("Action shape: {}".format(len(Prepared_Data_Sim['bc_train_set'].dummy_data['action'])))
     print("robot_qpos shape: {}".format(len(Prepared_Data_Sim['bc_train_set'].dummy_data['robot_qpos'])))
-    print("Sim_Real_Ratio: {}".format(sim_real_ratio))
     
     # make agent
     agent = ActAgent(args)
@@ -47,11 +43,11 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
         eval_freq = args['eval_freq']
     elif current_rank > 1 and not adr_dict['is_stop']:
         agent.load(os.path.join(args['sim_aug_dataset_folder'], f"epoch_best.pt"))
-        epochs = 300  # 100, 200            
+        epochs = 100  # 100, 200            
         eval_freq = 100 # 25, 50
     elif adr_dict['is_stop']:
         agent.load(os.path.join(args['sim_aug_dataset_folder'], f"epoch_best.pt"))
-        epochs = 1000  # 100, 200
+        epochs = 2000  # 100, 200
         eval_freq = 100 # 25, 50
     
     L = Logger("{}_{}".format(args['model_name'],epochs))
@@ -60,29 +56,34 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
     num_workers = 10
     eval_player = Eval_player(num_workers, args, agent.policy)
     best_success = 0
+    best_loss = 1
     for epoch in range(epochs):
         print('  ','Epoch: ', epoch)
         agent.policy.train()
-        loss_train_sim,loss_l1_sim,loss_kl_sim, loss_train_domain_sim, loss_val_sim = train_in_one_epoch(agent, Prepared_Data_Sim['it_per_epoch'], Prepared_Data_Sim['bc_train_dataloader'], 
+        loss_train,loss_l1,loss_kl, loss_train_domain, loss_val = train_in_one_epoch(agent, Prepared_Data_Sim['it_per_epoch'], Prepared_Data_Sim['bc_train_dataloader'], 
                                                 Prepared_Data_Sim['bc_validation_dataloader'], L, epoch)
-        loss_train_real,loss_l1_real,loss_kl_real,loss_train_domain_real, loss_val_real = train_in_one_epoch(agent, Prepared_Data_Real['it_per_epoch'], Prepared_Data_Real['bc_train_dataloader'], 
-                                                Prepared_Data_Real['bc_validation_dataloader'], L, epoch, sim_real_ratio)
+       
+        loss_val_real = loss_val[0]
         metrics = {
-            "loss/train_sim": loss_train_sim,
-            "loss/train_l1_sim": loss_l1_sim,
-            "loss/train_kl_sim": loss_kl_sim*args['kl_weight'],
-            "loss/train_domain_sim": loss_train_domain_sim,
-            "loss/val_sim": loss_val_sim,
-            "loss/train_real": loss_train_real,
-            "loss/train_l1_real": loss_l1_real,
-            "loss/train_kl_real": loss_kl_real*args['kl_weight'],
-            "loss/train_domain_real": loss_train_domain_real,
+            "loss/train": loss_train,
+            "loss/train_l1": loss_l1,
+            "loss/train_kl": loss_kl*args['kl_weight'],
+            "loss/train_domain": loss_train_domain,
             "loss/val_real": loss_val_real,
             "epoch": epoch,
             "current_rank": current_rank
         }
         
-        if (epoch + 1) % eval_freq == 0 and ((current_rank > 1 and (epoch + 1) >= 100) or (current_rank == 1 and (epoch + 1) >= 300)):
+        if len(loss_val) > 1:
+            loss_val_sim = loss_val[1]
+            metrics["val_sim"] = loss_val_sim
+        
+        if args['dann']:
+            if loss_val_real < best_loss:
+                best_loss = loss_val_real
+                agent.save(os.path.join(args['sim_aug_dataset_folder'], f"epoch_best.pt"), args)
+        
+        elif (epoch + 1) % eval_freq == 0 and ((current_rank > 1 and (epoch + 1) >= 100) or (current_rank == 1 and (epoch + 1) >= 300)):
             ##total_steps = x_steps * y_steps = 4 * 5 = 20
             torch.cuda.empty_cache()
             with torch.inference_mode():
@@ -144,7 +145,7 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
                  metrics["var_adr_plate"]=adr_dict['var_adr_plate']
 
         wandb.log(metrics)
-        
+    
     adr_dict["best_success"] = best_success
    
     return adr(args, current_rank, adr_dict)

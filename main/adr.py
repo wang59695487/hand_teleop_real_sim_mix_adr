@@ -41,7 +41,7 @@ def aug_in_adr(args, current_rank, demo_files):
 
         print('Replaying the sim demos and augmenting the dataset:')
         print('---------------------')
-        aug = {2:5,3:10,4:15,5:15}
+        aug = {2:5,3:10,4:15,5:500}
         ########### Add new sim demos to the original dataset ###########
         file1 = h5py.File(f"{args['sim_aug_dataset_folder']}/dataset.h5", 'a')
         for i in range(400):

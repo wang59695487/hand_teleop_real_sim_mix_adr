@@ -23,25 +23,38 @@ from dataset.act_dataset import argument_dependecy_checker, prepare_real_sim_dat
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def evaluate(agent, validation_loader, L, epoch):
-    loss_val = 0
+    loss_val_sim = []
+    loss_val_real = []
+    idx_sim = []
+    idx_real = []
+    
     with torch.inference_mode():
         agent.policy.eval()
         for iter, data_batch in enumerate(validation_loader):
-            obs, robot_qpos, action, label, is_pad, _ = data_batch
+            obs, robot_qpos, action, label, is_pad = data_batch
             obs, robot_qpos, action, label, is_pad = obs.cuda(), robot_qpos.cuda(), action.cuda(), label.cuda(), is_pad.cuda()
-            loss = agent.evaluate(obs, robot_qpos, action, is_pad)
-            loss_val += loss
-
-    loss_val /= len(validation_loader)
-
-    return loss_val
+            for i in range(len(label)):
+                if label[i] == 1:
+                    idx_real.append(i)
+                else:
+                    idx_sim.append(i)
+            loss_val_real.append(agent.evaluate(obs[idx_real], robot_qpos[idx_real], action[idx_real], is_pad[idx_real]))
+            if len(idx_sim) != 0:
+                loss_val_sim.append(agent.evaluate(obs[idx_sim], robot_qpos[idx_sim], action[idx_sim], is_pad[idx_sim]))
+           
+    loss_val_real = np.mean(loss_val_real)
+    if len(loss_val_sim) == 0:
+        return [loss_val_real]
+    else:
+        loss_val_sim = np.mean(loss_val_sim)
+        return [loss_val_real, loss_val_sim]
 
 ################## compute loss in one iteration #######################
 def compute_loss(agent, bc_train_dataloader, L, epoch):
 
     data_batch = next(iter(bc_train_dataloader))
-    obs, robot_qpos, action, label, is_pad, sim_real_label = data_batch
-    obs, robot_qpos, action, label, is_pad, sim_real_label = obs.cuda(), robot_qpos.cuda(), action.cuda(), label.cuda(), is_pad.cuda(), sim_real_label.cuda()
+    obs, robot_qpos, action, sim_real_label, is_pad  = data_batch
+    obs, robot_qpos, action, sim_real_label, is_pad  = obs.cuda(), robot_qpos.cuda(), action.cuda(), sim_real_label.cuda(), is_pad.cuda()
     loss_dict = agent.compute_loss(obs, robot_qpos, action, is_pad, sim_real_label)
     l1_loss = loss_dict['l1']
     kl_loss = loss_dict['kl']
