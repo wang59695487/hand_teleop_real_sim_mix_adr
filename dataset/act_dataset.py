@@ -23,11 +23,12 @@ def init(module, weight_init, bias_init, gain=1):
     return module
 
 class EpisodicDataset(Dataset):
-    def __init__(self, episode_ids, data_path=None, aug_before=None):
+    def __init__(self, episode_ids, data_path=None, aug_before=None, data_type=None):
         super(EpisodicDataset).__init__()
         self.episode_ids = episode_ids
         self.path = data_path
         self.aug_before = aug_before
+        self.data_type = data_type
         data_path = self.path[0] if self.aug_before is not None else self.path
         with h5py.File(data_path, 'r') as root:
             self.demo_data = root[f"episode_0"]
@@ -43,14 +44,11 @@ class EpisodicDataset(Dataset):
         if self.aug_before is not None:
             if episode_id < self.aug_before:
                 data_path = self.path[0]  
-                self.data_type = "real"
             else:
                 episode_id = episode_id - self.aug_before
                 data_path = self.path[1]
-                self.data_type = "sim"
         else:
             data_path = self.path
-            self.data_type = "real"
         with h5py.File(data_path, 'r') as root:
             self.episode_data  = root[f"episode_{episode_id}"]  
             self.obs = self.episode_data['obs']
@@ -87,50 +85,52 @@ class EpisodicDataset(Dataset):
         return obs, robot_qpos, padded_action, label, is_pad
 
     
-def prepare_sim_aug_data(real_dataset_folder=None, sim_dataset_folder=None,sim_dataset_aug_folder=None,sim_aug_demo_length=None, sim_batch_size=None, val_ratio = 0.1, seed = 0, chunk_size = 50):
-        
+def prepare_sim_aug_data(sim_dataset_folder=None,sim_dataset_aug_folder=None,sim_aug_demo_length=None, sim_batch_size=None, val_ratio = 0.1, seed = 0, chunk_size = 50):
+    data_type = "sim"
     print('=== Loading Sim trajectories ===')
     sim_demo_file = os.path.join(sim_dataset_folder, "dataset.h5")
     sim_img_data_aug = 1
     with open('{}/meta_data.pickle'.format(sim_dataset_folder),'rb') as file:
         sim_meta_data = pickle.load(file)
         sim_demo_length = sim_meta_data['total_episodes'] 
-       
+        total_episodes = sim_demo_length
+    
     if sim_dataset_aug_folder != None:
         sim_aug_demo_file = os.path.join(sim_dataset_aug_folder, "dataset.h5")
         sim_demo_file = [sim_demo_file, sim_aug_demo_file]
         sim_demo_length = [sim_demo_length,sim_aug_demo_length]
+        total_episodes = sim_demo_length[0] + sim_demo_length[1]
 
-    if real_dataset_folder==None:
-        data_type = "sim"
-        it_per_epoch, bc_train_set, bc_train_dataloader, bc_validation_dataloader = prepare_data(sim_demo_file, sim_demo_length, sim_batch_size, val_ratio, seed, sim_img_data_aug, chunk_size)
-    else:
-        data_type = "real_sim_mix"
-        print('=== Loading Real trajectories ===')
-        real_demo_file = os.path.join(real_dataset_folder, "dataset.h5")
-        with open('{}/meta_data.pickle'.format(real_dataset_folder),'rb') as file:
-            real_meta_data = pickle.load(file)
-            real_demo_length = real_meta_data['total_episodes'] 
-        demo_files = [real_demo_file, sim_aug_demo_file] if sim_dataset_aug_folder != None else real_demo_file
-        demo_length = [real_demo_length, sim_aug_demo_length] if sim_dataset_aug_folder != None else real_demo_length
-        it_per_epoch, bc_train_set, bc_train_dataloader, bc_validation_dataloader = prepare_data(demo_files, demo_length, sim_batch_size, val_ratio, seed, sim_img_data_aug, chunk_size)
+    it_per_epoch, bc_train_set, bc_train_dataloader, bc_validation_dataloader = prepare_data(data_type, sim_demo_file, sim_demo_length, sim_batch_size, val_ratio, seed, sim_img_data_aug, chunk_size)
             
     Prepared_Data = {"it_per_epoch": it_per_epoch, "bc_train_set": bc_train_set, "bc_train_dataloader": bc_train_dataloader, 
-                    "bc_validation_dataloader": bc_validation_dataloader, "data_type": data_type}
+                    "bc_validation_dataloader": bc_validation_dataloader, "total_episodes": total_episodes, "data_type": data_type}
 
     return Prepared_Data
 
+def prepare_real_data(real_dataset_folder=None, real_batch_size=None, val_ratio = 0.1, seed = 0, chunk_size = 50):
+    data_type = "real"
+    print('=== Loading Real trajectories ===')
+    real_demo_file = os.path.join(real_dataset_folder, "dataset.h5")
+    real_img_data_aug = 1
+    with open('{}/meta_data.pickle'.format(real_dataset_folder),'rb') as file:
+        real_meta_data = pickle.load(file)
+        real_demo_length = real_meta_data['total_episodes'] 
+    
+    it_per_epoch, bc_train_set, bc_train_dataloader, bc_validation_dataloader = prepare_data(data_type, real_demo_file, real_demo_length, real_batch_size, val_ratio, seed, real_img_data_aug, chunk_size)
+            
+    Prepared_Data = {"it_per_epoch": it_per_epoch, "bc_train_set": bc_train_set, "bc_train_dataloader": bc_train_dataloader, 
+                    "bc_validation_dataloader": bc_validation_dataloader, "total_episodes": real_demo_length, "data_type": data_type}
 
-def prepare_data(data_path, total_episodes, batch_size, val_ratio = 0.1, seed = 0, img_data_aug = 1, action_length = 50):
+    return Prepared_Data
+
+def prepare_data(data_type, data_path, total_episodes, batch_size, val_ratio = 0.1, seed = 0, img_data_aug = 1, action_length = 50):
     
     set_seed(seed)
     
     if len(data_path) == 2:
         aug_before = total_episodes[0]
         total_episodes = total_episodes[0] + total_episodes[1]
-    elif len(data_path) == 3:
-        aug_before = total_episodes[:2]
-        total_episodes = total_episodes[0] + total_episodes[1] + total_episodes[2]
     else:
         aug_before = None
         
@@ -138,8 +138,8 @@ def prepare_data(data_path, total_episodes, batch_size, val_ratio = 0.1, seed = 
     train_demo_idx = random_demo_id[:int(len(random_demo_id)*(1-val_ratio))]
     validation_demo_idx = random_demo_id[int(len(random_demo_id)*(1-val_ratio)):]
         
-    bc_train_set = EpisodicDataset(episode_ids=train_demo_idx, data_path=data_path,aug_before=aug_before)
-    bc_validation_set = EpisodicDataset(episode_ids=validation_demo_idx, data_path=data_path,aug_before=aug_before)
+    bc_train_set = EpisodicDataset(episode_ids=train_demo_idx, data_path=data_path,aug_before=aug_before, data_type=data_type)
+    bc_validation_set = EpisodicDataset(episode_ids=validation_demo_idx, data_path=data_path,aug_before=aug_before, data_type=data_type)
    
     bc_train_dataloader = DataLoader(bc_train_set, batch_size=batch_size, shuffle=True)
     val_batch_size = batch_size if batch_size < len(bc_validation_set) else len(bc_validation_set)
@@ -208,7 +208,7 @@ def prepare_real_sim_data(real_dataset_folder=None,sim_dataset_folder=None, back
             print("=== demo_length: ===")
             print(real_demo_length)
             data_type = "real"
-            it_per_epoch, bc_train_set, bc_train_dataloader, bc_validation_dataloader = prepare_data(real_demo_file, real_demo_length, real_batch_size, val_ratio, seed, real_img_data_aug, chunk_size)
+            it_per_epoch, bc_train_set, bc_train_dataloader, bc_validation_dataloader = prepare_data(data_type, real_demo_file, real_demo_length, real_batch_size, val_ratio, seed, real_img_data_aug, chunk_size)
             
         Prepared_Data = {"it_per_epoch": it_per_epoch, "bc_train_set": bc_train_set, "bc_train_dataloader": bc_train_dataloader, 
                      "bc_validation_dataloader": bc_validation_dataloader, "data_type": data_type}
