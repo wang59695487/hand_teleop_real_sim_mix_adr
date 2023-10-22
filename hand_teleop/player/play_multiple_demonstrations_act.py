@@ -328,7 +328,7 @@ def play_one_real_sim_visual_demo(args, demo, real_demo=None, real_images=None, 
                     
 
                     target_qpos = np.concatenate([arm_qpos, hand_qpos])
-                    env.step(target_qpos)
+                    env.robot.set_qpos(target_qpos)
         
         return visual_baked, meta_data
 
@@ -525,8 +525,8 @@ def parse_args():
     parser.add_argument("--img-data-aug", default="1", type=int)
     parser.add_argument("--sim-folder", default=None)
     parser.add_argument("--real-folder", default=None)
-    parser.add_argument("--task-name", required=True)
-    parser.add_argument("--object-name", required=True)
+    parser.add_argument("--task-name", default="pick_place")
+    parser.add_argument("--object-name", default="mustard_bottle")
     parser.add_argument("--out-folder", required=True)
     parser.add_argument("--with-features", default=False)
     parser.add_argument("--seed", default=20230929,type=int)

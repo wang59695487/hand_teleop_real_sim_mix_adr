@@ -285,7 +285,7 @@ if __name__ == '__main__':
         "randomness_rank": args.randomness_rank,
         "ckpt": args.ckpt,
         "task_name": args.task_name,
-        "seed": 20231014
+        "seed": 20230930
     }
     args = argument_dependecy_checker(args)
 
