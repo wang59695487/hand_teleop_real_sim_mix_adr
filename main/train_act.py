@@ -266,14 +266,14 @@ def main(args):
             print('  ', 'Epoch: ', epoch)
             agent.policy.train()
 
-            loss_train, loss_l1, loss_kl, loss_val = train_in_one_epoch(agent, Prepared_Data['it_per_epoch'], Prepared_Data['bc_train_dataloader'],
+            loss_train_dict = train_in_one_epoch(agent, Prepared_Data['it_per_epoch'], Prepared_Data['bc_train_dataloader'],
                                                                         Prepared_Data['bc_validation_dataloader'], L, epoch)
             metrics = {
-                "loss/train": loss_train,
-                "loss/train_l1": loss_l1,
-                "loss/train_kl": loss_kl*args['kl_weight'],
-                "loss/val": loss_val,
-                "epoch": epoch
+                        "loss/train": loss_train_dict["train"],
+                        "loss/train_l1": loss_train_dict["train_l1"],
+                        "loss/train_kl": loss_train_dict["train_kl"]*args['kl_weight'],
+                        "loss/val": loss_train_dict["val"],
+                        "epoch": epoch
             }
 
             wandb.log(metrics)

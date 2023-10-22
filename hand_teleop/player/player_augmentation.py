@@ -20,8 +20,8 @@ from hand_teleop.player.player import *
 
 
 def aug_in_non_sensitive_chunk(lifted_chunk, chunk_sensitivity):
-    aug_step_obj_length = 6  # hyperparameter
-    aug_step_plate_length = 6  # hyperparameter
+    aug_step_obj_length = 7  # hyperparameter
+    aug_step_plate_length = 7  # hyperparameter
     aug_obj_chunk = []
     aug_plate_chunk = []
     chunk_sensitivity_obj = np.argsort(
