@@ -1,63 +1,55 @@
-from random import random
-from typing import Dict, Any, Optional, List
-import numpy as np
+from pathlib import Path
+from typing import Optional
 import random
+
+import numpy as np
 import sapien.core as sapien
 import transforms3d
 
 from hand_teleop.env.sim_env.base import BaseSimulationEnv
 from hand_teleop.real_world import lab
-from hand_teleop.utils.render_scene_utils import set_entity_color
-from hand_teleop.utils.ycb_object_utils import (
-    load_ycb_object,
-    YCB_SIZE,
-    YCB_ORIENTATION,
-)
-from hand_teleop.utils.egad_object_utils import load_egad_object, EGAD_NAME
+from hand_teleop.utils.ycb_object_utils import load_ycb_object, YCB_SIZE
 
 
-class PickPlaceEnv(BaseSimulationEnv):
+class PourBoxEnv(BaseSimulationEnv):
     def __init__(
         self,
         use_gui=True,
         frame_skip=5,
-        object_category="YCB",
-        object_name="tomato_soup_can",
         object_seed=0,
-        object_scale=1.0,
+        object_name="chip_can",
         randomness_scale=1,
         friction=1,
         use_visual_obs=False,
         init_obj_pos: Optional[sapien.Pose] = None,
         init_target_pos: Optional[sapien.Pose] = None,
-        **renderer_kwargs
+        **renderer_kwargs,
     ):
         super().__init__(
             use_gui=use_gui,
             frame_skip=frame_skip,
             use_visual_obs=use_visual_obs,
-            **renderer_kwargs
+            **renderer_kwargs,
         )
 
         # Object info
-        self.object_category = object_category
-        self.object_name = object_name
-        self.object_scale = object_scale
-        self.object_height = object_scale * YCB_SIZE[self.object_name][2] / 2
+        self.bottle_name = object_name
+        self.bottle_scale = 0.0066
+        self.bottle_height = 17.7909 * self.bottle_scale
+        self.bowl_name = "bowl"
+        self.bowl_height = YCB_SIZE[self.bowl_name][2] / 2
         self.object_seed = object_seed
 
         # Dynamics info
         if init_obj_pos is None:
             self.init_pose = self.generate_random_object_pose(randomness_scale)
             print("Randomizing Object Location")
-            # print('Object Seed', self.object_seed)
-            # print('Object Scale', self.object_scale)
-            # print('Object Height', self.object_height)
             print("Object Location", self.init_pose)
         else:
             print("Using Given Object Location")
             self.init_pose = init_obj_pos
         self.friction = friction
+        self.randomness_scale = randomness_scale
 
         # Construct scene
         self.scene = self.engine.create_scene()
@@ -72,83 +64,60 @@ class PickPlaceEnv(BaseSimulationEnv):
 
         # Load table
         self.tables = self.create_lab_tables(table_height=0.91)
-        # self.tables = self.create_table(table_height=0.6, table_half_size=[0.65, 0.65, 0.025])
 
-        # Load box/plate
-        # self.box = self.load_partnet_obj(100426, scale = 0.3, material_spec=[1,1,0], density=100, fix_root=False)
-        # self.box.set_pose(sapien.Pose([0, 0, 0.1]))
-        self.target_object = load_ycb_object(self.scene, "plate", static=True)
+        # Load bowl
         if init_target_pos is None:
-            print("Randomizing Target Location")
-            self.target_pose = self.generate_random_target_pose(randomness_scale)
+            self.target_pose = sapien.Pose([0.0, 0.2, self.bowl_height])
         else:
             print("Using Given Target Location")
             self.target_pose = init_target_pos
+        self.target_object = load_ycb_object(self.scene, self.bowl_name, static=True)
         self.target_object.set_pose(self.target_pose)
 
-        # Load object
-        if self.object_category.lower() == "ycb":
-            self.manipulated_object = load_ycb_object(self.scene, object_name)
-            self.manipulated_object.set_pose(self.init_pose)
-        else:
-            raise NotImplementedError
+        # Load box
+        self.boxes = self.load_box()
+        for box in self.boxes:
+            box.set_pose(self.init_pose)
 
-        self.generate_random_object_texture(randomness_scale)
+        # Load bottle
+        bottle_material = self.scene.create_physical_material(0.5, 0.3, 0.01)
+        bottle_dir = Path(__file__).parent.parent.parent.parent / "assets/misc/chip_can"
+        visual_mesh = bottle_dir / "pringles.obj"
+        collision_mesh = bottle_dir / "pringles_collision.obj"
+        builder = self.scene.create_actor_builder()
+        builder.add_visual_from_file(
+            str(visual_mesh),
+            scale=[self.bottle_scale] * 3,
+            pose=sapien.Pose(q=[0.707, 0.707, 0, 0]),
+        )
+        builder.add_multiple_collisions_from_file(
+            str(collision_mesh),
+            scale=[self.bottle_scale] * 3,
+            pose=sapien.Pose(q=[0.707, 0.707, 0, 0]),
+            material=bottle_material,
+        )
+        self.manipulated_object = builder.build(self.bottle_name)
+
+        # print('################################Randomizing Object Texture##########################')
+        # self.generate_random_object_texture(randomness_scale)
 
     def generate_random_object_pose(self, randomness_scale):
         random.seed(self.object_seed)
         pos_x = random.uniform(-0.1, 0.1) * randomness_scale
-        pos_y = random.uniform(0.2, 0.3) * randomness_scale
-        position = np.array([pos_x, pos_y, 0.1])
-        # euler = self.np_random.uniform(low=np.deg2rad(15), high=np.deg2rad(25))
-        if self.object_name != "sugar_box":
-            euler = random.uniform(np.deg2rad(15), np.deg2rad(25))
-        else:
-            euler = random.uniform(np.deg2rad(80), np.deg2rad(90))
+        pos_y = random.uniform(-0.18, -0.08) * randomness_scale
+        position = np.array([pos_x, pos_y, 0])
+        euler = random.uniform(np.deg2rad(0), np.deg2rad(300))
         orientation = transforms3d.euler.euler2quat(0, 0, euler)
-        random_pose = sapien.Pose(position, orientation)
-        return random_pose
-
-    def generate_random_target_pose(self, randomness_scale):
-        pos_x = self.np_random.uniform(low=-0.15, high=0.15) * randomness_scale
-        pos_y = self.np_random.uniform(low=-0.12, high=-0.2) * randomness_scale
-        random_pose = sapien.Pose([pos_x, pos_y, 0.1])
-        random_pose = sapien.Pose([-0.005, -0.12, 0])
-
-        return random_pose
-
-    def generate_random_object_texture(self, randomness_scale):
-        var = 0.1 * randomness_scale
-        default_color = np.array([1, 0, 0, 1])
-        for visual in self.target_object.get_visual_bodies():
-            for geom in visual.get_render_shapes():
-                mat = geom.material
-                mat.set_base_color(default_color)
-                mat.set_specular(random.uniform(0, var))
-                mat.set_roughness(random.uniform(0.7 - var, 0.7 + var))
-                mat.set_metallic(random.uniform(0, var))
-                geom.set_material(mat)
-
-        for table in self.tables:
-            for visual in table.get_visual_bodies():
-                for geom in visual.get_render_shapes():
-                    mat = geom.material
-                    mat.set_specular(random.uniform(0, var))
-                    mat.set_roughness(random.uniform(0.7 - var, 0.7 + var))
-                    mat.set_metallic(random.uniform(0, var))
-                    geom.set_material(mat)
-
-        for visual in self.manipulated_object.get_visual_bodies():
-            for geom in visual.get_render_shapes():
-                mat = geom.material
-                mat.set_specular(random.uniform(0, var))
-                mat.set_roughness(random.uniform(0.7 - var, 0.7 + var))
-                mat.set_metallic(random.uniform(0, var))
-                geom.set_material(mat)
+        return sapien.Pose(position, orientation)
 
     def reset_env(self):
-        self.manipulated_object.set_pose(self.init_pose)
+        init_pose = self.generate_random_object_pose(self.randomness_scale)
+        self.manipulated_object.set_pose(init_pose)
         self.target_object.set_pose(self.target_pose)
+
+        print(init_pose)
+        for box in self.boxes:
+            box.set_pose(init_pose)
 
     def create_lab_tables(self, table_height):
         # Build object table first
@@ -239,24 +208,48 @@ class PickPlaceEnv(BaseSimulationEnv):
         robot_table = builder.build_static("robot_table")
         return object_table, robot_table
 
+    def load_box(self):
+        box_material = self.scene.create_physical_material(0.1, 0.1, 0.01)
+        colors = [
+            np.array([1, 0, 0, 1]),
+            np.array([0, 1, 0, 1]),
+            np.array([0, 0, 1, 1]),
+            np.array([1, 1, 0, 1]),
+        ]
+        box_half_len = 0.0125
+        box_len = box_half_len * 2
+        box_size = np.ones(3) * box_half_len
+        boxes = []
+        for i, color in enumerate(colors):
+            builder = self.scene.create_actor_builder()
+            builder.add_box_visual(
+                half_size=box_size,
+                color=color,
+                pose=sapien.Pose([0, 0, box_len * i + 0.1]),
+            )
+            builder.add_box_collision(
+                half_size=box_size,
+                material=box_material,
+                pose=sapien.Pose([0, 0, box_len * i + 0.1]),
+            )
+            boxes.append(builder.build(f"box_{i}"))
+        return boxes
+
 
 def env_test():
     from sapien.utils import Viewer
     from constructor import add_default_scene_light
 
     randomness_scale = 1
-    env = PickPlaceEnv(
-        object_name="tomato_soup_can",
-        object_category="YCB",
-        randomness_scale=randomness_scale,
-        object_scale=0.8,
-    )
+    env = PourBoxEnv(randomness_scale=randomness_scale)
+    env.reset_env()
     viewer = Viewer(env.renderer)
     viewer.set_scene(env.scene)
     add_default_scene_light(env.scene, env.renderer)
+    viewer.toggle_pause(True)
+    viewer.render()
     env.viewer = viewer
 
-    env.reset_env()
     while not viewer.closed:
         env.simple_step()
         env.render()
