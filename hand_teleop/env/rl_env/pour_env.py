@@ -134,8 +134,18 @@ class PourBoxRLEnv(PourBoxEnv, BaseRLEnv):
         return 250
 
     def _num_box_in_bowl(self):
-        contact_buffer = self.check_actor_pair_contacts(self.boxes, self.target_object)
-        return np.sum(contact_buffer)
+        # check the contact between the box and the target
+        num_box_in_bowl = 0
+        tar_pos_x = self.target_object.pose.p[0]
+        tar_pos_y = self.target_object.pose.p[1]
+        for i in range(len(self.boxes)):
+            box = self.boxes[i]
+            #correct the box pose
+            box_world_pose = box.pose * sapien.Pose([0,0,0.025*i + 0.1],box.pose.q)
+            if np.abs(box_world_pose.p[0]-tar_pos_x) < 0.0795 and np.abs(box_world_pose.p[1]-tar_pos_y) < 0.0795:
+                num_box_in_bowl += 1
+
+        return num_box_in_bowl
 
     def _is_object_lifted(self):
         # check the x-y position of the object against the target
