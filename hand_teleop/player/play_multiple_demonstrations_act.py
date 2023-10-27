@@ -72,7 +72,8 @@ def play_multiple_sim_visual(args):
     print("Dataset ready:")
     print("----------------------")
     print("Number of demos: {}".format(total))
-    print("Number of datapoints: {}".format(total_episodes * args["chunk_size"]))
+    print("Number of datapoints: {}".format(
+        total_episodes * args["chunk_size"]))
     print("Shape of observations: {}".format(obs.shape))
     print("Shape of Robot_qpos: {}".format(robot_qpos.shape))
     print("Action dimension: {}".format(len(action)))
@@ -99,7 +100,8 @@ def play_multiple_real_visual(args):
 
     for file_name in os.listdir(args["real_demo_folder"]):
         if ".pkl" in file_name:
-            demo_files.append(os.path.join(args["real_demo_folder"], file_name))
+            demo_files.append(os.path.join(
+                args["real_demo_folder"], file_name))
 
     print("Replaying the real demos and creating the dataset:")
     print("---------------------")
@@ -116,8 +118,8 @@ def play_multiple_real_visual(args):
         with open(file_name, "rb") as file:
             real_demo = pickle.load(file)
             path = "./sim/raw_data/{}_{}/{}_0004.pickle".format(
-                    "pick_place", "mustard_bottle", "mustard_bottle")
-            #print("sim_file: ", path)
+                "pick_place", "mustard_bottle", "mustard_bottle")
+            # print("sim_file: ", path)
             demo = np.load(path, allow_pickle=True)
             visual_baked, meta_data = play_one_real_sim_visual_demo(
                 args=args,
@@ -136,7 +138,8 @@ def play_multiple_real_visual(args):
     print("Dataset ready:")
     print("----------------------")
     print("Number of demos: {}".format(len(demo_files)))
-    print("Number of datapoints: {}".format(total_episodes * args["chunk_size"]))
+    print("Number of datapoints: {}".format(
+        total_episodes * args["chunk_size"]))
     print("Shape of observations: {}".format(obs.shape))
     print("Shape of Robot_qpos: {}".format(robot_qpos.shape))
     print("Action dimension: {}".format(len(action)))
@@ -210,6 +213,8 @@ def play_one_real_sim_visual_demo(
         env = DClawRLEnv(**env_params)
     elif task_name == "pour":
         env = PourBoxRLEnv(**env_params)
+        meta_data["env_kwargs"]["init_target_pos"] = sapien.Pose(
+            [0.0, 0.2, env.bowl_height])
     else:
         raise NotImplementedError
 
@@ -243,7 +248,8 @@ def play_one_real_sim_visual_demo(
                         *(1 * robot_arm_control_params), mode="force"
                     )
                 else:
-                    joint.set_drive_property(*(1 * finger_control_params), mode="force")
+                    joint.set_drive_property(
+                        *(1 * finger_control_params), mode="force")
             env.rl_step = env.simple_sim_step
 
     env.reset()
@@ -258,7 +264,8 @@ def play_one_real_sim_visual_demo(
 
     # Specify modality
     empty_info = {}  # level empty dict for now, reserved for future
-    camera_info = {"relocate_view": {"rgb": empty_info, "segmentation": empty_info}}
+    camera_info = {"relocate_view": {
+        "rgb": empty_info, "segmentation": empty_info}}
     env.setup_visual_obs_config(camera_info)
 
     # Player
@@ -291,7 +298,8 @@ def play_one_real_sim_visual_demo(
             "link_10.0",
         ]
         indices = [0, 1, 2, 3, 5, 6, 7, 8]
-        joint_names = [joint.get_name() for joint in env.robot.get_active_joints()]
+        joint_names = [joint.get_name()
+                       for joint in env.robot.get_active_joints()]
         retargeting = PositionRetargeting(
             env.robot,
             joint_names,
@@ -328,18 +336,19 @@ def play_one_real_sim_visual_demo(
 
     if using_real_data:
         ee_pose = baked_data[0]["ee_pose"]
-        hand_qpos_prev = baked_data[0]["teleop_cmd"][env.arm_dof :]
+        hand_qpos_prev = baked_data[0]["teleop_cmd"][env.arm_dof:]
     else:
         ee_pose = baked_data["ee_pose"][0]
-        hand_qpos_prev = baked_data["action"][0][env.arm_dof :]
+        hand_qpos_prev = baked_data["action"][0][env.arm_dof:]
 
     if using_real_data:
         for idx in tqdm(range(len(baked_data))):
             # NOTE: robot.get_qpos() version
             if idx != len(baked_data) - 1:
                 ee_pose_next = np.array(baked_data[idx + 1]["ee_pose"])
-                ee_pose_delta = np.sqrt(np.sum((ee_pose_next[:3] - ee_pose[:3]) ** 2))
-                hand_qpos = baked_data[idx + 1]["teleop_cmd"][env.arm_dof :]
+                ee_pose_delta = np.sqrt(
+                    np.sum((ee_pose_next[:3] - ee_pose[:3]) ** 2))
+                hand_qpos = baked_data[idx + 1]["teleop_cmd"][env.arm_dof:]
 
                 delta_hand_qpos = hand_qpos - hand_qpos_prev if idx != 0 else hand_qpos
 
@@ -355,7 +364,8 @@ def play_one_real_sim_visual_demo(
                     palm_pose = env.ee_link.get_pose()
                     palm_pose = robot_pose.inv() * palm_pose
 
-                    palm_next_pose = sapien.Pose(ee_pose_next[0:3], ee_pose_next[3:7])
+                    palm_next_pose = sapien.Pose(
+                        ee_pose_next[0:3], ee_pose_next[3:7])
                     palm_next_pose = robot_pose.inv() * palm_next_pose
 
                     palm_delta_pose = palm_pose.inv() * palm_next_pose
@@ -366,10 +376,12 @@ def play_one_real_sim_visual_demo(
                         delta_angle = 2 * np.pi - delta_angle
                         delta_axis = -delta_axis
                     delta_axis_world = (
-                        palm_pose.to_transformation_matrix()[:3, :3] @ delta_axis
+                        palm_pose.to_transformation_matrix()[
+                            :3, :3] @ delta_axis
                     )
                     delta_pose = np.concatenate(
-                        [palm_next_pose.p - palm_pose.p, delta_axis_world * delta_angle]
+                        [palm_next_pose.p - palm_pose.p,
+                            delta_axis_world * delta_angle]
                     )
 
                     palm_jacobian = (
@@ -427,8 +439,9 @@ def play_one_real_sim_visual_demo(
             # NOTE: robot.get_qpos() version
             if idx != len(baked_data["obs"]) - frame_skip:
                 ee_pose_next = baked_data["ee_pose"][idx + frame_skip]
-                ee_pose_delta = np.sqrt(np.sum((ee_pose_next[:3] - ee_pose[:3]) ** 2))
-                hand_qpos = baked_data["action"][idx][env.arm_dof :]
+                ee_pose_delta = np.sqrt(
+                    np.sum((ee_pose_next[:3] - ee_pose[:3]) ** 2))
+                hand_qpos = baked_data["action"][idx][env.arm_dof:]
                 delta_hand_qpos = hand_qpos - hand_qpos_prev if idx != 0 else hand_qpos
 
                 if (
@@ -440,7 +453,7 @@ def play_one_real_sim_visual_demo(
                 else:
                     valid_frame += 1
 
-                    if task_name in ["pick_place","pour"]:
+                    if task_name in ["pick_place", "pour"]:
                         if env._is_object_lifted() and lifted_chunk == 0:
                             lifted_chunk = int((valid_frame - 1) / 50)
 
@@ -450,7 +463,8 @@ def play_one_real_sim_visual_demo(
                     palm_pose = env.ee_link.get_pose()
                     palm_pose = robot_pose.inv() * palm_pose
 
-                    palm_next_pose = sapien.Pose(ee_pose_next[0:3], ee_pose_next[3:7])
+                    palm_next_pose = sapien.Pose(
+                        ee_pose_next[0:3], ee_pose_next[3:7])
                     palm_next_pose = robot_pose.inv() * palm_next_pose
 
                     palm_delta_pose = palm_pose.inv() * palm_next_pose
@@ -461,10 +475,12 @@ def play_one_real_sim_visual_demo(
                         delta_angle = 2 * np.pi - delta_angle
                         delta_axis = -delta_axis
                     delta_axis_world = (
-                        palm_pose.to_transformation_matrix()[:3, :3] @ delta_axis
+                        palm_pose.to_transformation_matrix()[
+                            :3, :3] @ delta_axis
                     )
                     delta_pose = np.concatenate(
-                        [palm_next_pose.p - palm_pose.p, delta_axis_world * delta_angle]
+                        [palm_next_pose.p - palm_pose.p,
+                            delta_axis_world * delta_angle]
                     )
 
                     palm_jacobian = (
@@ -495,7 +511,7 @@ def play_one_real_sim_visual_demo(
                     )
 
                     _, _, _, info = env.step(target_qpos)
-                   
+
                     info_success = info["success"]
 
                     if info_success:
@@ -519,7 +535,7 @@ def play_one_real_sim_visual_demo(
                             ee_pose_delta = np.sqrt(
                                 np.sum((ee_pose_next[:3] - ee_pose[:3]) ** 2)
                             )
-                            hand_qpos = baked_data["action"][idx][env.arm_dof :]
+                            hand_qpos = baked_data["action"][idx][env.arm_dof:]
                             delta_hand_qpos = (
                                 hand_qpos - hand_qpos_prev if idx != 0 else hand_qpos
                             )
@@ -554,7 +570,8 @@ def play_one_real_sim_visual_demo(
                                     delta_angle = 2 * np.pi - delta_angle
                                     delta_axis = -delta_axis
                                 delta_axis_world = (
-                                    palm_pose.to_transformation_matrix()[:3, :3]
+                                    palm_pose.to_transformation_matrix()[
+                                        :3, :3]
                                     @ delta_axis
                                 )
                                 delta_pose = np.concatenate(
@@ -576,10 +593,12 @@ def play_one_real_sim_visual_demo(
                                     delta_pose, palm_jacobian
                                 )[: env.arm_dof]
                                 arm_qpos = (
-                                    arm_qvel + env.robot.get_qpos()[: env.arm_dof]
+                                    arm_qvel +
+                                    env.robot.get_qpos()[: env.arm_dof]
                                 )
 
-                                target_qpos = np.concatenate([arm_qpos, hand_qpos])
+                                target_qpos = np.concatenate(
+                                    [arm_qpos, hand_qpos])
 
                                 _, _, _, info = env.step(target_qpos)
 
@@ -602,36 +621,37 @@ def stack_and_save_frames(
         using_features=args["with_features"],
     )
     assert len(visual_demo_with_features["obs"]) % args["num_data_aug"] == 0
-    data_aug_length = int(len(visual_demo_with_features["obs"]) / args["num_data_aug"])
+    data_aug_length = int(
+        len(visual_demo_with_features["obs"]) / args["num_data_aug"])
     obs = []
     action = []
     robot_qpos = []
     for ii in range(args["num_data_aug"]):
         obs.extend(
             visual_demo_with_features["obs"][
-                ii * data_aug_length : (ii + 1) * data_aug_length
+                ii * data_aug_length: (ii + 1) * data_aug_length
             ]
         )
         action.extend(
             visual_demo_with_features["action"][
-                ii * data_aug_length : (ii + 1) * data_aug_length
+                ii * data_aug_length: (ii + 1) * data_aug_length
             ]
         )
         robot_qpos.extend(
             visual_demo_with_features["robot_qpos"][
-                ii * data_aug_length : (ii + 1) * data_aug_length
+                ii * data_aug_length: (ii + 1) * data_aug_length
             ]
         )
 
     for episode in range(len(obs) // args["chunk_size"]):
         obs_chunk = obs[
-            episode * args["chunk_size"] : (episode + 1) * args["chunk_size"]
+            episode * args["chunk_size"]: (episode + 1) * args["chunk_size"]
         ]
         action_chunk = action[
-            episode * args["chunk_size"] : (episode + 1) * args["chunk_size"]
+            episode * args["chunk_size"]: (episode + 1) * args["chunk_size"]
         ]
         robot_qpos_chunk = robot_qpos[
-            episode * args["chunk_size"] : (episode + 1) * args["chunk_size"]
+            episode * args["chunk_size"]: (episode + 1) * args["chunk_size"]
         ]
         sim_real_label_chunk = (
             np.array([1 for _ in range(len(obs_chunk))])
@@ -644,17 +664,17 @@ def stack_and_save_frames(
         g1.create_dataset("action", data=action_chunk)
         g1.create_dataset("robot_qpos", data=robot_qpos_chunk)
         g1.create_dataset("sim_real_label", data=sim_real_label_chunk)
-    
+
     if len(obs) % args["chunk_size"] != 0 and using_real_data:
-        obs_chunk = obs[(episode + 1) * args["chunk_size"] :]
+        obs_chunk = obs[(episode + 1) * args["chunk_size"]:]
         obs_chunk = obs_chunk + [
             obs_chunk[-1] for _ in range(args["chunk_size"] - len(obs_chunk))
         ]
-        action_chunk = action[(episode + 1) * args["chunk_size"] :]
+        action_chunk = action[(episode + 1) * args["chunk_size"]:]
         action_chunk = action_chunk + [
             action_chunk[-1] for _ in range(args["chunk_size"] - len(action_chunk))
         ]
-        robot_qpos_chunk = robot_qpos[(episode + 1) * args["chunk_size"] :]
+        robot_qpos_chunk = robot_qpos[(episode + 1) * args["chunk_size"]:]
         robot_qpos_chunk = robot_qpos_chunk + [
             robot_qpos_chunk[-1]
             for _ in range(args["chunk_size"] - len(robot_qpos_chunk))
@@ -692,13 +712,13 @@ def stack_and_save_frames_aug(
 
     for episode in range(len(obs) // args["num_queries"]):
         obs_chunk = obs[
-            episode * args["num_queries"] : (episode + 1) * args["num_queries"]
+            episode * args["num_queries"]: (episode + 1) * args["num_queries"]
         ]
         action_chunk = action[
-            episode * args["num_queries"] : (episode + 1) * args["num_queries"]
+            episode * args["num_queries"]: (episode + 1) * args["num_queries"]
         ]
         robot_qpos_chunk = robot_qpos[
-            episode * args["num_queries"] : (episode + 1) * args["num_queries"]
+            episode * args["num_queries"]: (episode + 1) * args["num_queries"]
         ]
         sim_real_label_chunk = (
             np.array([1 for _ in range(len(obs_chunk))])
@@ -747,8 +767,10 @@ def stack_and_save_frames_aug(
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument("--backbone-type", default=None)
-    parser.add_argument("--sim-delta-ee-pose-bound", default="0.0005", type=float)
-    parser.add_argument("--real-delta-ee-pose-bound", default="0.0005", type=float)
+    parser.add_argument("--sim-delta-ee-pose-bound",
+                        default="0.0005", type=float)
+    parser.add_argument("--real-delta-ee-pose-bound",
+                        default="0.0005", type=float)
     parser.add_argument("--frame-skip", default="1", type=int)
     parser.add_argument("--chunk-size", default="50", type=int)
     parser.add_argument("--img-data-aug", default="1", type=int)

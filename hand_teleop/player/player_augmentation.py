@@ -25,11 +25,12 @@ def aug_in_non_sensitive_chunk(lifted_chunk, chunk_sensitivity):
     aug_obj_chunk = []
     aug_target_chunk = []
     chunk_sensitivity_obj = np.argsort(
-        -np.array(chunk_sensitivity[1:lifted_chunk]))
-    aug_obj_chunk = chunk_sensitivity_obj[:aug_step_obj_length]
+        -np.array(chunk_sensitivity[:lifted_chunk]))
+    aug_obj_chunk = chunk_sensitivity_obj[:aug_step_obj_length] if aug_step_obj_length <= lifted_chunk else chunk_sensitivity_obj
     chunk_sensitivity_target = np.argsort(
         -np.array(chunk_sensitivity[lifted_chunk:len(chunk_sensitivity)]))
-    aug_target_chunk = chunk_sensitivity_target[:aug_step_target_length]
+    aug_target_chunk = chunk_sensitivity_target[:aug_step_target_length] if aug_step_target_length <= len(
+        chunk_sensitivity)-lifted_chunk else chunk_sensitivity_target
 
     return aug_obj_chunk, aug_target_chunk
 
@@ -183,12 +184,12 @@ def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_target, in
     hand_qpos_prev = baked_data["action"][0][env.arm_dof:]
 
     ################################# Kinematic Augmentation####################################
-    if task_name in ["pick_place","pour"]:
+    if task_name in ["pick_place", "pour"]:
         sensitive_chunk_file = f"{args['sim_dataset_folder']}/meta_data.pickle"
         with open(sensitive_chunk_file, 'rb') as file:
             sensitive_chunk_data = pickle.load(file)
         aug_obj_chunk, aug_target_chunk = aug_in_non_sensitive_chunk(sensitive_chunk_data['lifted_chunks'][demo_idx],
-                                                                    chunk_sensitivity=sensitive_chunk_data['chunks_sensitivity'][demo_idx])
+                                                                     chunk_sensitivity=sensitive_chunk_data['chunks_sensitivity'][demo_idx])
         aug_step_obj = len(aug_obj_chunk)*50
         aug_step_target = len(aug_target_chunk)*50
         meta_data["env_kwargs"]['init_target_pos'] = init_pose_aug_target * \
@@ -196,7 +197,7 @@ def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_target, in
         env.target_object.set_pose(meta_data["env_kwargs"]['init_target_pos'])
         aug_target = np.array([init_pose_aug_obj.p[0], init_pose_aug_obj.p[1]])
         one_step_aug_target = np.array([(-1*init_pose_aug_obj.p[0]+init_pose_aug_target.p[0]) /
-                                      aug_step_target, (-1*init_pose_aug_obj.p[1]+init_pose_aug_target.p[1])/aug_step_target])
+                                        aug_step_target, (-1*init_pose_aug_obj.p[1]+init_pose_aug_target.p[1])/aug_step_target])
     elif task_name == 'dclaw':
         aug_step_obj = 50
 
@@ -205,10 +206,10 @@ def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_target, in
     env.manipulated_object.set_pose(meta_data["env_kwargs"]['init_obj_pos'])
     if task_name == 'pour':
         for i in range(len(env.boxes)):
-            env.boxes[i].set_pose(meta_data["env_kwargs"]['init_obj_pos']) 
+            env.boxes[i].set_pose(meta_data["env_kwargs"]['init_obj_pos'])
 
     ################# Avoid the case that the object is already close to the target or there is no chunk for augmentation################
-    if (task_name in ["pick_place","pour"] and env._is_close_to_target()) or len(aug_obj_chunk) == 0 or len(aug_target_chunk) == 0:
+    if (task_name in ["pick_place", "pour"] and env._is_close_to_target()) or len(aug_obj_chunk) == 0 or len(aug_target_chunk) == 0:
         return visual_baked, meta_data, False
 
     aug_obj = np.array([0, 0])
@@ -241,7 +242,7 @@ def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_target, in
                 hand_qpos_prev = hand_qpos
                 palm_pose = env.ee_link.get_pose()
                 palm_pose = robot_pose.inv() * palm_pose
-                if task_name in ['pick_place','pour']:
+                if task_name in ['pick_place', 'pour']:
                     if env._is_object_lifted():
                         if aug_step_target > 0 and chunk_idx in aug_target_chunk:
                             aug_step_target -= 1
@@ -300,7 +301,6 @@ def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_target, in
                                                                   env.ee_link.get_pose().p, env.ee_link.get_pose().q]))
                 _, _, _, info = env.step(target_qpos)
 
-             
                 info_success = info['success']
 
                 if info_success:
@@ -485,7 +485,7 @@ def generate_sim_aug(args, all_data, init_pose_aug_target, init_pose_aug_obj, au
         [init_pose_aug_obj.p[0]/aug_step_obj, init_pose_aug_obj.p[0]/aug_step_obj])
     aug_target = np.array([init_pose_aug_obj.p[0], init_pose_aug_obj.p[1]])
     one_step_aug_target = np.array([(-1*init_pose_aug_obj.p[0]+init_pose_aug_target.p[0]) /
-                                  aug_step_target, (-1*init_pose_aug_obj.p[1]+init_pose_aug_target.p[1])/aug_step_target])
+                                    aug_step_target, (-1*init_pose_aug_obj.p[1]+init_pose_aug_target.p[1])/aug_step_target])
 
     stop_frame = 0
     valid_frame = 0
