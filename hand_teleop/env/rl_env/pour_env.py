@@ -140,9 +140,16 @@ class PourBoxRLEnv(PourBoxEnv, BaseRLEnv):
         tar_pos_y = self.target_object.pose.p[1]
         for i in range(len(self.boxes)):
             box = self.boxes[i]
-            #correct the box pose
-            box_world_pose = box.pose * sapien.Pose([0,0,0.025*i + 0.1],box.pose.q)
-            if np.abs(box_world_pose.p[0]-tar_pos_x) < 0.0795 and np.abs(box_world_pose.p[1]-tar_pos_y) < 0.0795:
+            # correct the box pose
+            box_world_pose = box.pose * sapien.Pose([0, 0, 0.025 * i + 0.1], box.pose.q)
+            is_bottle_contact = self.check_contact([box], [self.manipulated_object])
+            is_table_contact = self.check_contact([box], [self.tables])
+            if (
+                np.abs(box_world_pose.p[0] - tar_pos_x) < 0.0795
+                and np.abs(box_world_pose.p[1] - tar_pos_y) < 0.0795
+                and not is_table_contact
+                and not is_bottle_contact
+            ):
                 num_box_in_bowl += 1
 
         return num_box_in_bowl
