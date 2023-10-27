@@ -66,7 +66,7 @@ def create_env(args):
         print('Found initial object pose')
         env_params['init_obj_pos'] = meta_data["env_kwargs"]['init_obj_pos']
 
-    if 'init_target_pos' in meta_data["env_kwargs"].keys() and task_name == 'pick_place':
+    if 'init_target_pos' in meta_data["env_kwargs"].keys() and task_name in ['pick_place','pour']:
         print('Found initial target pose')
         env_params['init_target_pos'] = meta_data["env_kwargs"]['init_target_pos']
 
@@ -74,6 +74,8 @@ def create_env(args):
         env = PickPlaceRLEnv(**env_params)
     elif task_name == 'dclaw':
         env = DClawRLEnv(**env_params)
+    elif task_name == 'pour':
+        env = PourBoxRLEnv(**env_params)
     else:
         raise NotImplementedError
     
@@ -170,44 +172,55 @@ def eval_in_env(args, log_dir, epoch, eval_idx, x, y, randomness_rank, policy, a
     
     ########### Initialize the Robot Qpose ############ 
     task_name = meta_data['task_name']
-    if task_name == "pick_place":
-        init_robot_qpos = [0, (-45/180)*np.pi, 0, 0, (45/180)*np.pi, (-90/180)*np.pi] + [0] * 16
-    elif task_name == "dclaw":
+
+    if task_name == "dclaw":
         init_robot_qpos = [0, (20/180)*np.pi, -(85/180)*np.pi, 0, (112/180)*np.pi, -np.pi / 2] + [0] * 16
+    else:
+        init_robot_qpos = [0, (-45/180)*np.pi, 0, 0, (45/180)*np.pi, (-90/180)*np.pi] + [0] * 16
     env.robot.set_qpos(init_robot_qpos)
     
     ########### Initialize the object pose ############  
     idx = np.random.randint(len(meta_data['init_obj_poses']))
     sampled_pos = meta_data['init_obj_poses'][idx]
     object_p = np.array([x, y, sampled_pos.p[-1]])
-    object_pos = sapien.Pose(p=object_p, q=sampled_pos.q) if task_name == "pick_place" else sapien.Pose(p=object_p, q=[0.707, 0, 0, 0.707])
+    object_pos = sapien.Pose(p=object_p, q=sampled_pos.q) if task_name in ["pick_place","pour"] else sapien.Pose(p=object_p, q=[0.707, 0, 0, 0.707])
     print('Object Pos: {}'.format(object_pos))
 
     env.manipulated_object.set_pose(object_pos)
+    if task_name == "pour":
+        for i in range(len(env.boxes)):
+            env.boxes[i].set_pose(object_pos) 
         
-    ########### Add Plate Randomness ############
-    if task_name == "pick_place":
+    ########### Add target-object Randomness ############
+    if task_name in ["pick_place","pour"]:
         if randomness_rank > 2:
-            ########### Randomize the plate pose ############
-            var_plate = [0.08,0.2] if randomness_rank < 4 else [0.16,0.2]
-            print("############################Randomize the plate pose##################")
-            x2 = np.random.uniform(-var_plate[0], var_plate[0])
-            y2 = np.random.uniform(0, var_plate[1])
-            plate_random_plate = sapien.Pose([-0.005+x2, -0.1-y2, 0],[1,0,0,0]) 
-            dist_xy = np.linalg.norm(object_pos.p[:2] - plate_random_plate.p[:2])
+            ########### Randomize the target-object  ############
+            var_target = [0.08,0.2] if randomness_rank < 4 else [0.16,0.2]
+            print("############################Randomize the target pose##################")
+            x2 = np.random.uniform(-var_target[0], var_target[0])
+            y2 = np.random.uniform(0, var_target[1])
+            if task_name == "pick_place":
+                aug_random_target = sapien.Pose([-0.005+x2, -0.1-y2, 0],[1,0,0,0])
+            elif task_name == "pour":
+                aug_random_target = sapien.Pose([0+x2, 0.2+y2/2, env.bowl_height],[1,0,0,0]) 
+            dist_xy = np.linalg.norm(object_pos.p[:2] - aug_random_target.p[:2])
             if dist_xy >= 0.25:
-                env.plate.set_pose(plate_random_plate)
+                env.target_object.set_pose(aug_random_target)
             else:
-                env.plate.set_pose(sapien.Pose([-0.005, -0.12, 0],[1,0,0,0]))
-            print('Target Pos: {}'.format(plate_random_plate))
+                if task_name == "pick_place":
+                    env.target_object.set_pose(sapien.Pose([-0.005, -0.12, 0],[1,0,0,0]))
+                elif task_name == "pour":
+                    env.target_object.set_pose(sapien.Pose([0, 0.2, env.bowl_height],[1,0,0,0]))
+                        
+            print('Target Pos: {}'.format(aug_random_target))
         else:
-            env.plate.set_pose(sapien.Pose([-0.005, -0.12, 0],[1,0,0,0]))
+            if task_name == "pick_place":
+                env.target_object.set_pose(sapien.Pose([-0.005, -0.12, 0],[1,0,0,0]))
+            elif task_name == "pour":
+                env.target_object.set_pose(sapien.Pose([0, 0.2, env.bowl_height],[1,0,0,0]))
    
     for _ in range(10*env.frame_skip):
         env.scene.step()
-    
-    if task_name == "dclaw":
-        env.reset()
             
     obs = env.get_observation()
     success = False
@@ -244,11 +257,8 @@ def eval_in_env(args, log_dir, epoch, eval_idx, x, y, randomness_rank, policy, a
         real_action = apply_IK_get_real_action(raw_action, env, env.robot.get_qpos())
 
         next_obs, reward, done, info = env.step(real_action)
-
-        if task_name == "pick_place":
-            info_success = info["is_object_lifted"] and info["success"]
-        elif task_name == "dclaw":
-            info_success = info["success"]
+        
+        info_success = info["success"]
         
         success = success or info_success
         if success:
@@ -261,6 +271,9 @@ def eval_in_env(args, log_dir, epoch, eval_idx, x, y, randomness_rank, policy, a
     if task_name == "pick_place":
         is_lifted = info["is_object_lifted"]
         video_path = os.path.join(log_dir, f"epoch_{epoch}_{eval_idx}_rank{randomness_rank}_{success}_{is_lifted}.mp4")
+    elif task_name == "pour":
+        num_in_bowl = info["num_box_in_bowl"]
+        video_path = os.path.join(log_dir, f"epoch_{epoch}_{eval_idx}_rank{randomness_rank}_{success}_{num_in_bowl}.mp4")
     elif task_name == "dclaw":
         total_angle = info["object_total_rotate_angle"]
         video_path = os.path.join(log_dir, f"epoch_{epoch}_{eval_idx}_rank{randomness_rank}_{success}_{total_angle}.mp4")

@@ -161,6 +161,15 @@ class PourBoxRLEnv(PourBoxEnv, BaseRLEnv):
             self.is_object_lifted = True
 
         return self.is_object_lifted
+    
+    def _is_close_to_target(self):
+        # check the x-y position of the object against the target
+        object_xy = self.manipulated_object.pose.p[:-1]
+        target_xy = self.target_object.pose.p[:-1]
+        dist_xy = np.linalg.norm(object_xy - target_xy)
+        close_to_target = dist_xy <= 0.2
+
+        return close_to_target
 
     def _is_bottle_still(self):
         # check if the object is close to still
@@ -170,7 +179,7 @@ class PourBoxRLEnv(PourBoxEnv, BaseRLEnv):
         return object_is_still
 
     def _is_success(self):
-        return self._num_box_in_bowl() >= 2 & self._is_object_lifted()
+        return self._num_box_in_bowl() >= 2 and self._is_object_lifted()
 
     def get_info(self):
         return {

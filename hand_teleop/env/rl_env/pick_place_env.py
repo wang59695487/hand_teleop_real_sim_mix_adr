@@ -324,6 +324,7 @@ class PickPlaceRLEnv(PickPlaceEnv, BaseRLEnv):
     def get_info(self):
         return {
             "success": self._is_success(),
+            "is_object_lifted": self._is_object_lifted(),
         }
 
 

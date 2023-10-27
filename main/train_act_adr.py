@@ -114,15 +114,19 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
                 eval_player.eval_init()
                 avg_success = 0
                 for rank in range(1, args['randomness_rank']+1):
-                    if args['task_name'] == 'pick_place':
+                    if args['task_name'] in ['pick_place', 'pour']:
                         var_object = [0, 0] if rank < 4 else [
                             0.05, 0.08]  # 0.05, 0.1
                         # -0.08 0.08 /// -0.05 0
                         x = np.linspace(-0.08 -
                                         var_object[0], 0.12+var_object[1], 5)
                         # 0.12 0.18 /// 0.12 0.32
-                        y = np.linspace(
-                            0.2-var_object[1], 0.3+var_object[0], 4)
+                        if args['task_name'] == 'pick_place':
+                            y = np.linspace(
+                                0.2-var_object[1], 0.3+var_object[0], 4)
+                        elif args['task_name'] == 'pour':
+                            y = np.linspace(
+                                -0.18-var_object[1]*2, -0.08+var_object[0]/2, 4)
                         for i in range(20):
                             eval_player.eval_start(
                                 log_dir, epoch+1, i+1, x[int(i/4)], y[i % 4], rank)
@@ -175,8 +179,8 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
             metrics["var_adr_light"] = adr_dict['var_adr_light']
             metrics["var_adr_object"] = adr_dict['var_adr_object']
 
-            if args['task_name'] == 'pick_place':
-                metrics["var_adr_plate"] = adr_dict['var_adr_plate']
+            if args['task_name'] in ['pick_place', 'pour']:
+                metrics["var_adr_target"] = adr_dict['var_adr_target']
 
         wandb.log(metrics)
 

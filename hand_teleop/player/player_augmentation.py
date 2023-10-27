@@ -20,18 +20,18 @@ from hand_teleop.player.player import *
 
 
 def aug_in_non_sensitive_chunk(lifted_chunk, chunk_sensitivity):
-    aug_step_obj_length = 7  # hyperparameter
-    aug_step_plate_length = 7  # hyperparameter
+    aug_step_obj_length = 6  # hyperparameter
+    aug_step_target_length = 6  # hyperparameter
     aug_obj_chunk = []
-    aug_plate_chunk = []
+    aug_target_chunk = []
     chunk_sensitivity_obj = np.argsort(
         -np.array(chunk_sensitivity[1:lifted_chunk]))
     aug_obj_chunk = chunk_sensitivity_obj[:aug_step_obj_length]
-    chunk_sensitivity_plate = np.argsort(
+    chunk_sensitivity_target = np.argsort(
         -np.array(chunk_sensitivity[lifted_chunk:len(chunk_sensitivity)]))
-    aug_plate_chunk = chunk_sensitivity_plate[:aug_step_plate_length]
+    aug_target_chunk = chunk_sensitivity_target[:aug_step_target_length]
 
-    return aug_obj_chunk, aug_plate_chunk
+    return aug_obj_chunk, aug_target_chunk
 
 
 def create_env(args, demo, retarget=False):
@@ -85,6 +85,8 @@ def create_env(args, demo, retarget=False):
         env = PickPlaceRLEnv(**env_params)
     elif task_name == 'dclaw':
         env = DClawRLEnv(**env_params)
+    elif task_name == 'pour':
+        env = PourBoxRLEnv(**env_params)
     else:
         raise NotImplementedError
 
@@ -133,6 +135,9 @@ def create_env(args, demo, retarget=False):
     elif task_name == 'dclaw':
         player = DcLawEnvPlayer(meta_data, data, env,
                                 zero_joint_pos=env_params["zero_joint_pos"])
+    elif task_name == 'pour':
+        player = PourEnvPlayer(meta_data, data, env,
+                               zero_joint_pos=env_params["zero_joint_pos"])
     else:
         raise NotImplementedError
 
@@ -165,7 +170,7 @@ def create_env(args, demo, retarget=False):
     return env, task_name, meta_data, baked_data
 
 
-def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_plate, init_pose_aug_obj, var_adr_light, frame_skip=1, retarget=False):
+def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_target, init_pose_aug_obj, var_adr_light, frame_skip=1, retarget=False):
 
     env, task_name, meta_data, baked_data = create_env(
         args, demo=demo, retarget=retarget)
@@ -178,29 +183,32 @@ def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_plate, ini
     hand_qpos_prev = baked_data["action"][0][env.arm_dof:]
 
     ################################# Kinematic Augmentation####################################
-    if task_name == 'pick_place':
+    if task_name in ["pick_place","pour"]:
         sensitive_chunk_file = f"{args['sim_dataset_folder']}/meta_data.pickle"
         with open(sensitive_chunk_file, 'rb') as file:
             sensitive_chunk_data = pickle.load(file)
-        aug_obj_chunk, aug_plate_chunk = aug_in_non_sensitive_chunk(sensitive_chunk_data['lifted_chunks'][demo_idx],
+        aug_obj_chunk, aug_target_chunk = aug_in_non_sensitive_chunk(sensitive_chunk_data['lifted_chunks'][demo_idx],
                                                                     chunk_sensitivity=sensitive_chunk_data['chunks_sensitivity'][demo_idx])
         aug_step_obj = len(aug_obj_chunk)*50
-        aug_step_plate = len(aug_plate_chunk)*50
-        meta_data["env_kwargs"]['init_target_pos'] = init_pose_aug_plate * \
+        aug_step_target = len(aug_target_chunk)*50
+        meta_data["env_kwargs"]['init_target_pos'] = init_pose_aug_target * \
             meta_data["env_kwargs"]['init_target_pos']
-        env.plate.set_pose(meta_data["env_kwargs"]['init_target_pos'])
-        aug_plate = np.array([init_pose_aug_obj.p[0], init_pose_aug_obj.p[1]])
-        one_step_aug_plate = np.array([(-1*init_pose_aug_obj.p[0]+init_pose_aug_plate.p[0]) /
-                                      aug_step_plate, (-1*init_pose_aug_obj.p[1]+init_pose_aug_plate.p[1])/aug_step_plate])
+        env.target_object.set_pose(meta_data["env_kwargs"]['init_target_pos'])
+        aug_target = np.array([init_pose_aug_obj.p[0], init_pose_aug_obj.p[1]])
+        one_step_aug_target = np.array([(-1*init_pose_aug_obj.p[0]+init_pose_aug_target.p[0]) /
+                                      aug_step_target, (-1*init_pose_aug_obj.p[1]+init_pose_aug_target.p[1])/aug_step_target])
     elif task_name == 'dclaw':
         aug_step_obj = 50
 
     meta_data["env_kwargs"]['init_obj_pos'] = init_pose_aug_obj * \
         meta_data["env_kwargs"]['init_obj_pos']
     env.manipulated_object.set_pose(meta_data["env_kwargs"]['init_obj_pos'])
+    if task_name == 'pour':
+        for i in range(len(env.boxes)):
+            env.boxes[i].set_pose(meta_data["env_kwargs"]['init_obj_pos']) 
 
     ################# Avoid the case that the object is already close to the target or there is no chunk for augmentation################
-    if (task_name == 'pick_place' and env._is_close_to_target()) or len(aug_obj_chunk) == 0 or len(aug_plate_chunk) == 0:
+    if (task_name in ["pick_place","pour"] and env._is_close_to_target()) or len(aug_obj_chunk) == 0 or len(aug_target_chunk) == 0:
         return visual_baked, meta_data, False
 
     aug_obj = np.array([0, 0])
@@ -233,13 +241,13 @@ def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_plate, ini
                 hand_qpos_prev = hand_qpos
                 palm_pose = env.ee_link.get_pose()
                 palm_pose = robot_pose.inv() * palm_pose
-                if task_name == 'pick_place':
+                if task_name in ['pick_place','pour']:
                     if env._is_object_lifted():
-                        if aug_step_plate > 0 and chunk_idx in aug_plate_chunk:
-                            aug_step_plate -= 1
-                            # print("!!!!!!!!!!!!!!!!!!!!!!Alter!!!!!!!!!!!!!!!!!!!!!", aug_step_plate)
-                            aug_plate = aug_plate + one_step_aug_plate
-                        palm_next_pose = sapien.Pose([aug_plate[0], aug_plate[1], 0], [
+                        if aug_step_target > 0 and chunk_idx in aug_target_chunk:
+                            aug_step_target -= 1
+                            # print("!!!!!!!!!!!!!!!!!!!!!!Alter!!!!!!!!!!!!!!!!!!!!!", aug_step_target)
+                            aug_target = aug_target + one_step_aug_target
+                        palm_next_pose = sapien.Pose([aug_target[0], aug_target[1], 0], [
                                                      1, 0, 0, 0])*sapien.Pose(ee_pose_next[0:3], ee_pose_next[3:7])
 
                     elif not env._is_object_lifted():
@@ -292,11 +300,8 @@ def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_plate, ini
                                                                   env.ee_link.get_pose().p, env.ee_link.get_pose().q]))
                 _, _, _, info = env.step(target_qpos)
 
-                if task_name == 'pick_place':
-                    info_success = info["is_object_lifted"] and env._object_target_distance(
-                    ) <= 0.2 and env._is_object_plate_contact()
-                elif task_name == 'dclaw':
-                    info_success = info['success']
+             
+                info_success = info['success']
 
                 if info_success:
                     stop_frame += 1
@@ -310,7 +315,7 @@ def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_plate, ini
     return visual_baked, meta_data, info_success
 
 
-def generate_sim_aug(args, all_data, init_pose_aug_plate, init_pose_aug_obj, aug_step_plate=400, aug_step_obj=500, retarget=False, frame_skip=1):
+def generate_sim_aug(args, all_data, init_pose_aug_target, init_pose_aug_obj, aug_step_target=400, aug_step_obj=500, retarget=False, frame_skip=1):
 
     meta_data = all_data["meta_data"]
     task_name = meta_data["env_kwargs"]['task_name']
@@ -464,11 +469,11 @@ def generate_sim_aug(args, all_data, init_pose_aug_plate, init_pose_aug_obj, aug
     ee_pose = baked_data["ee_pose"][0]
     hand_qpos_prev = baked_data["action"][0][env.arm_dof:]
 
-    meta_data["env_kwargs"]['init_target_pos'] = init_pose_aug_plate * \
+    meta_data["env_kwargs"]['init_target_pos'] = init_pose_aug_target * \
         meta_data["env_kwargs"]['init_target_pos']
     meta_data["env_kwargs"]['init_obj_pos'] = init_pose_aug_obj * \
         meta_data["env_kwargs"]['init_obj_pos']
-    env.plate.set_pose(meta_data["env_kwargs"]['init_target_pos'])
+    env.target.set_pose(meta_data["env_kwargs"]['init_target_pos'])
     env.manipulated_object.set_pose(meta_data["env_kwargs"]['init_obj_pos'])
 
     ################# Avoid the case that the object is already close to the target################
@@ -478,9 +483,9 @@ def generate_sim_aug(args, all_data, init_pose_aug_plate, init_pose_aug_obj, aug
     aug_obj = np.array([0, 0])
     one_step_aug_obj = np.array(
         [init_pose_aug_obj.p[0]/aug_step_obj, init_pose_aug_obj.p[0]/aug_step_obj])
-    aug_plate = np.array([init_pose_aug_obj.p[0], init_pose_aug_obj.p[1]])
-    one_step_aug_plate = np.array([(-1*init_pose_aug_obj.p[0]+init_pose_aug_plate.p[0]) /
-                                  aug_step_plate, (-1*init_pose_aug_obj.p[1]+init_pose_aug_plate.p[1])/aug_step_plate])
+    aug_target = np.array([init_pose_aug_obj.p[0], init_pose_aug_obj.p[1]])
+    one_step_aug_target = np.array([(-1*init_pose_aug_obj.p[0]+init_pose_aug_target.p[0]) /
+                                  aug_step_target, (-1*init_pose_aug_obj.p[1]+init_pose_aug_target.p[1])/aug_step_target])
 
     stop_frame = 0
     valid_frame = 0
@@ -507,11 +512,11 @@ def generate_sim_aug(args, all_data, init_pose_aug_plate, init_pose_aug_obj, aug
                 palm_pose = robot_pose.inv() * palm_pose
 
                 if env._is_object_lifted():
-                    if aug_step_plate > 0:
-                        aug_step_plate -= 1
-                        # print("!!!!!!!!!!!!!!!!!!!!!!Alter!!!!!!!!!!!!!!!!!!!!!", aug_step_plate)
-                        aug_plate = aug_plate + one_step_aug_plate
-                    palm_next_pose = sapien.Pose([aug_plate[0], aug_plate[1], 0], [
+                    if aug_step_target > 0:
+                        aug_step_target -= 1
+                        # print("!!!!!!!!!!!!!!!!!!!!!!Alter!!!!!!!!!!!!!!!!!!!!!", aug_step_target)
+                        aug_target = aug_target + one_step_aug_target
+                    palm_next_pose = sapien.Pose([aug_target[0], aug_target[1], 0], [
                                                  1, 0, 0, 0])*sapien.Pose(ee_pose_next[0:3], ee_pose_next[3:7])
 
                 elif not env._is_object_lifted():
@@ -552,7 +557,7 @@ def generate_sim_aug(args, all_data, init_pose_aug_plate, init_pose_aug_obj, aug
 
                 if task_name == 'pick_place':
                     info_success = info["is_object_lifted"] and env._object_target_distance(
-                    ) <= 0.2 and env._is_object_plate_contact()
+                    ) <= 0.2 and env._is_object_target_contact()
 
                 if info_success:
                     stop_frame += 1
@@ -614,8 +619,8 @@ def player_augmenting(args):
             #     last_num = sorted([int(x.replace(".pickle", "").split("_")[-1]) for x in pkl_files])[-1]
             #     num_test = str(last_num + 1).zfill(4)
             init_pose_aug_obj = sapien.Pose([x1, y1, 0], [1, 0, 0, 0])
-            init_pose_aug_plate = sapien.Pose([x2, y2, 0], [1, 0, 0, 0])
-            info_success, data, video = generate_sim_aug(args, all_data=all_data, init_pose_aug_plate=init_pose_aug_plate,
+            init_pose_aug_target = sapien.Pose([x2, y2, 0], [1, 0, 0, 0])
+            info_success, data, video = generate_sim_aug(args, all_data=all_data, init_pose_aug_target=init_pose_aug_target,
                                                          init_pose_aug_obj=init_pose_aug_obj, frame_skip=args['frame_skip'], retarget=args['retarget'])
             # imageio.mimsave(f"./temp/demos/aug_{args['object_name']}/demo_{demo_id+1}_{num_test}_x{x:.2f}_y{y:.2f}.mp4", video, fps=120)
             if info_success:

@@ -24,7 +24,7 @@ def aug_in_adr(args, current_rank, demo_files):
                 init_obj_poses = all_meta_data["init_obj_poses"]
                 last_best_success = all_meta_data["best_success"]
                 var_adr_light = all_meta_data["var_adr_light"]
-                var_adr_plate = all_meta_data["var_adr_plate"]
+                var_adr_target = all_meta_data["var_adr_target"]
                 var_adr_object = all_meta_data["var_adr_object"]
                 is_var_adr = all_meta_data["is_var_adr"]
                 is_stop = all_meta_data["is_stop"]
@@ -35,7 +35,7 @@ def aug_in_adr(args, current_rank, demo_files):
                 total_episodes = 0
                 init_obj_poses = []
                 var_adr_light = 1
-                var_adr_plate = 0.02
+                var_adr_target = 0.02
                 var_adr_object = 0.02
                 is_var_adr = True
                 is_stop = False
@@ -46,33 +46,42 @@ def aug_in_adr(args, current_rank, demo_files):
 
         print("Replaying the sim demos and augmenting the dataset:")
         print("---------------------")
-        aug = {2: 5, 3: 10, 4: 15, 5: 100}
+        # aug = {2: 5, 3: 10, 4: 15, 5: 100}
+        aug = {2: 10, 3: 20, 4: 30, 5: 300}
         ########### Add new sim demos to the original dataset ###########
         file1 = h5py.File(f"{args['sim_aug_dataset_folder']}/dataset.h5", "a")
         for i in range(400):
             for _, file_name in enumerate(demo_files):
                 print(file_name)
                 demo_idx = file_name.split("/")[-1].split(".")[0]
-                if args["task_name"] == "pick_place":
+                if args["task_name"] in ["pick_place","pour"]:
                     var_obj = var_adr_object if current_rank >= 4 else 0
-                    x1, y1 = np.random.uniform(-0.02 - var_obj, 0.02 + var_obj, 2)
+                    if args["task_name"] == "pick_place":
+                        x1, y1 = np.random.uniform(-0.02 - var_obj, 0.02 + var_obj, 2)
+                    elif args["task_name"] == "pour":
+                        x1 = np.random.uniform(-0.02 - var_obj, 0.02 + var_obj)
+                        y1 = np.random.uniform(-0.02 - var_obj*2, 0.02)
                     if np.fabs(x1) <= 0.01 and np.fabs(y1) <= 0.01:
                         continue
                     init_pose_aug_obj = sapien.Pose([x1, y1, 0], [1, 0, 0, 0])
 
-                    var_plate = var_adr_plate if current_rank >= 3 else 0
-                    x2 = np.random.uniform(-0.02 - var_plate, 0.02 + var_plate)
-                    y2 = np.random.uniform(-0.02 - var_plate * 2, 0.02)
+                    var_target = var_adr_target if current_rank >= 3 else 0
+                    if args["task_name"] == "pick_place":
+                        x2 = np.random.uniform(-0.02 - var_target, 0.02 + var_target)
+                        y2 = np.random.uniform(-0.02 - var_target * 2, 0.02)
+                    elif args["task_name"] == "pour":
+                        x2 = np.random.uniform(-0.02 - var_target, 0.02 + var_target)
+                        y2 = np.random.uniform(0, 0.02 + var_target)
                     if np.fabs(x2) <= 0.01 and np.fabs(y2) <= 0.01:
                         continue
-                    init_pose_aug_plate = sapien.Pose([x2, y2, 0], [1, 0, 0, 0])
+                    init_pose_aug_target = sapien.Pose([x2, y2, 0], [1, 0, 0, 0])
 
                 elif args["task_name"] == "dclaw":
                     var_obj = var_adr_object if current_rank >= 3 else 0
                     x1 = np.random.uniform(-var_obj / 2, var_obj / 2)
                     y1 = np.random.uniform(-var_obj, var_obj)
                     init_pose_aug_obj = sapien.Pose([x1, y1, 0], [1, 0, 0, 0])
-                    init_pose_aug_plate = None
+                    init_pose_aug_target = None
 
                 with open(file_name, "rb") as file:
                     demo = pickle.load(file)
@@ -82,7 +91,7 @@ def aug_in_adr(args, current_rank, demo_files):
                     args,
                     demo=all_data,
                     demo_idx=demo_idx,
-                    init_pose_aug_plate=init_pose_aug_plate,
+                    init_pose_aug_target=init_pose_aug_target,
                     init_pose_aug_obj=init_pose_aug_obj,
                     var_adr_light=var_adr_light,
                 )
@@ -109,7 +118,7 @@ def aug_in_adr(args, current_rank, demo_files):
             "last_total_episodes": last_total_episodes,
             "last_best_success": last_best_success,
             "var_adr_light": var_adr_light,
-            "var_adr_plate": var_adr_plate,
+            "var_adr_target": var_adr_target,
             "var_adr_object": var_adr_object,
             "is_var_adr": is_var_adr,
             "is_stop": is_stop,
@@ -155,17 +164,17 @@ def adr(args, current_rank, adr_dict):
                 adr_dict["var_adr_light"] = 2
                 current_rank += 1
 
-        elif current_rank == 3 and args["task_name"] == "pick_place":
-            adr_dict["var_adr_plate"] = (
-                adr_dict["var_adr_plate"] + 0.02
+        elif current_rank == 3 and args["task_name"] in ["pick_place","pour"]:
+            adr_dict["var_adr_target"] = (
+                adr_dict["var_adr_target"] + 0.02
                 if adr_dict["is_var_adr"]
-                else adr_dict["var_adr_plate"]
+                else adr_dict["var_adr_target"]
             )
-            if adr_dict["var_adr_plate"] > 0.1:
-                adr_dict["var_adr_plate"] = 0.1
+            if adr_dict["var_adr_target"] > 0.1:
+                adr_dict["var_adr_target"] = 0.1
                 current_rank += 1
 
-        elif current_rank == 4 and args["task_name"] == "pick_place":
+        elif current_rank == 4 and args["task_name"] in ["pick_place","pour"]:
             adr_dict["var_adr_object"] = (
                 adr_dict["var_adr_object"] + 0.02
                 if adr_dict["is_var_adr"]

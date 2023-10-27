@@ -11,6 +11,7 @@ from torchvision.transforms import v2
 
 from hand_teleop.env.rl_env.pick_place_env import PickPlaceRLEnv
 from hand_teleop.env.rl_env.dclaw_env import DClawRLEnv
+from hand_teleop.env.rl_env.pour_env import PourBoxRLEnv
 from hand_teleop.player.player import *
 from hand_teleop.player.randomization_utils import *
 from hand_teleop.real_world import lab
@@ -114,15 +115,9 @@ def play_multiple_real_visual(args):
 
         with open(file_name, "rb") as file:
             real_demo = pickle.load(file)
-            if args["task_name"] == "pick_place":
-                path = "./sim/raw_data/{}_{}/{}_0004.pickle".format(
-                    args["task_name"], args["object_name"], args["object_name"]
-                )
-            elif args["task_name"] == "dclaw":
-                path = "./sim/raw_data/{}/{}_0004.pickle".format(
-                    args["task_name"], args["object_name"]
-                )
-            print("sim_file: ", path)
+            path = "./sim/raw_data/{}_{}/{}_0004.pickle".format(
+                    "pick_place", "mustard_bottle", "mustard_bottle")
+            #print("sim_file: ", path)
             demo = np.load(path, allow_pickle=True)
             visual_baked, meta_data = play_one_real_sim_visual_demo(
                 args=args,
@@ -213,6 +208,8 @@ def play_one_real_sim_visual_demo(
         env = PickPlaceRLEnv(**env_params)
     elif task_name == "dclaw":
         env = DClawRLEnv(**env_params)
+    elif task_name == "pour":
+        env = PourBoxRLEnv(**env_params)
     else:
         raise NotImplementedError
 
@@ -271,6 +268,10 @@ def play_one_real_sim_visual_demo(
         )
     elif task_name == "dclaw":
         player = DcLawEnvPlayer(
+            meta_data, data, env, zero_joint_pos=env_params["zero_joint_pos"]
+        )
+    elif task_name == "pour":
+        player = PourEnvPlayer(
             meta_data, data, env, zero_joint_pos=env_params["zero_joint_pos"]
         )
     else:
@@ -433,12 +434,13 @@ def play_one_real_sim_visual_demo(
                 if (
                     ee_pose_delta <= args["sim_delta_ee_pose_bound"]
                     and np.mean(handqpos2angle(delta_hand_qpos)) <= 1.2
+                    and task_name in ["pick_place", "dclaw"]
                 ):
                     continue
                 else:
                     valid_frame += 1
 
-                    if task_name == "pick_place":
+                    if task_name in ["pick_place","pour"]:
                         if env._is_object_lifted() and lifted_chunk == 0:
                             lifted_chunk = int((valid_frame - 1) / 50)
 
@@ -493,12 +495,8 @@ def play_one_real_sim_visual_demo(
                     )
 
                     _, _, _, info = env.step(target_qpos)
-
-                    if task_name == "pick_place":
-                        info_success = info["is_object_lifted"] and info["success"]
-
-                    elif task_name == "dclaw":
-                        info_success = info["success"]
+                   
+                    info_success = info["success"]
 
                     if info_success:
                         stop_frame += 1
@@ -507,7 +505,7 @@ def play_one_real_sim_visual_demo(
                         break
 
         chunk_sensitivity = []
-        if info_success:
+        if info_success and task_name in ["pick_place", "pour"]:
             # assign weights for action chunk
             total_frame = len(visual_baked["obs"])
             for i in tqdm(range(total_frame // 50)):
@@ -529,6 +527,7 @@ def play_one_real_sim_visual_demo(
                             if (
                                 ee_pose_delta < 0.001
                                 and np.mean(handqpos2angle(delta_hand_qpos)) <= 1.2
+                                and task_name in ["pick_place", "dclaw"]
                             ):
                                 continue
                             else:
@@ -583,16 +582,8 @@ def play_one_real_sim_visual_demo(
                                 target_qpos = np.concatenate([arm_qpos, hand_qpos])
 
                                 _, _, _, info = env.step(target_qpos)
-                                if task_name == "pick_place":
-                                    info_success_weight = (
-                                        info["is_object_lifted"]
-                                        and env._object_target_distance() <= 0.2
-                                        and env._is_object_plate_contact()
-                                    )
-                                elif task_name == "dclaw":
-                                    info_success_weight = info["success"]
 
-                    if not info_success_weight or var == 2.0:
+                    if not info["success"] or var == 2.0:
                         chunk_sensitivity.append(var)
                         break
 
@@ -653,6 +644,34 @@ def stack_and_save_frames(
         g1.create_dataset("action", data=action_chunk)
         g1.create_dataset("robot_qpos", data=robot_qpos_chunk)
         g1.create_dataset("sim_real_label", data=sim_real_label_chunk)
+    
+    if len(obs) % args["chunk_size"] != 0 and using_real_data:
+        obs_chunk = obs[(episode + 1) * args["chunk_size"] :]
+        obs_chunk = obs_chunk + [
+            obs_chunk[-1] for _ in range(args["chunk_size"] - len(obs_chunk))
+        ]
+        action_chunk = action[(episode + 1) * args["chunk_size"] :]
+        action_chunk = action_chunk + [
+            action_chunk[-1] for _ in range(args["chunk_size"] - len(action_chunk))
+        ]
+        robot_qpos_chunk = robot_qpos[(episode + 1) * args["chunk_size"] :]
+        robot_qpos_chunk = robot_qpos_chunk + [
+            robot_qpos_chunk[-1]
+            for _ in range(args["chunk_size"] - len(robot_qpos_chunk))
+        ]
+        sim_real_label_chunk = (
+            np.array([1 for _ in range(len(obs_chunk))])
+            if using_real_data
+            else torch.tensor([0 for _ in range(len(obs_chunk))])
+        )
+        episode = episode + 1
+        if f"episode_{episode+total_episode}" in file1.keys():
+            del file1[f"episode_{episode+total_episode}"]
+        g1 = file1.create_group(f"episode_{episode+total_episode}")
+        g1.create_dataset("obs", data=obs_chunk)
+        g1.create_dataset("action", data=action_chunk)
+        g1.create_dataset("robot_qpos", data=robot_qpos_chunk)
+        g1.create_dataset("sim_real_label", data=sim_real_label_chunk)
 
     return episode + total_episode + 1, obs[0], action[0], robot_qpos[0]
 
@@ -694,33 +713,33 @@ def stack_and_save_frames_aug(
         g1.create_dataset("robot_qpos", data=robot_qpos_chunk)
         g1.create_dataset("sim_real_label", data=sim_real_label_chunk)
 
-    if len(obs) % args["num_queries"] != 0:
-        obs_chunk = obs[(episode + 1) * args["num_queries"] :]
-        obs_chunk = obs_chunk + [
-            obs_chunk[-1] for _ in range(args["num_queries"] - len(obs_chunk))
-        ]
-        action_chunk = action[(episode + 1) * args["num_queries"] :]
-        action_chunk = action_chunk + [
-            action_chunk[-1] for _ in range(args["num_queries"] - len(action_chunk))
-        ]
-        robot_qpos_chunk = robot_qpos[(episode + 1) * args["num_queries"] :]
-        robot_qpos_chunk = robot_qpos_chunk + [
-            robot_qpos_chunk[-1]
-            for _ in range(args["num_queries"] - len(robot_qpos_chunk))
-        ]
-        sim_real_label_chunk = (
-            np.array([1 for _ in range(len(obs_chunk))])
-            if using_real_data
-            else torch.tensor([0 for _ in range(len(obs_chunk))])
-        )
-        episode = episode + 1
-        if f"episode_{episode+total_episode}" in file1.keys():
-            del file1[f"episode_{episode+total_episode}"]
-        g1 = file1.create_group(f"episode_{episode+total_episode}")
-        g1.create_dataset("obs", data=obs_chunk)
-        g1.create_dataset("action", data=action_chunk)
-        g1.create_dataset("robot_qpos", data=robot_qpos_chunk)
-        g1.create_dataset("sim_real_label", data=sim_real_label_chunk)
+    # if len(obs) % args["num_queries"] != 0:
+    #     obs_chunk = obs[(episode + 1) * args["num_queries"] :]
+    #     obs_chunk = obs_chunk + [
+    #         obs_chunk[-1] for _ in range(args["num_queries"] - len(obs_chunk))
+    #     ]
+    #     action_chunk = action[(episode + 1) * args["num_queries"] :]
+    #     action_chunk = action_chunk + [
+    #         action_chunk[-1] for _ in range(args["num_queries"] - len(action_chunk))
+    #     ]
+    #     robot_qpos_chunk = robot_qpos[(episode + 1) * args["num_queries"] :]
+    #     robot_qpos_chunk = robot_qpos_chunk + [
+    #         robot_qpos_chunk[-1]
+    #         for _ in range(args["num_queries"] - len(robot_qpos_chunk))
+    #     ]
+    #     sim_real_label_chunk = (
+    #         np.array([1 for _ in range(len(obs_chunk))])
+    #         if using_real_data
+    #         else torch.tensor([0 for _ in range(len(obs_chunk))])
+    #     )
+    #     episode = episode + 1
+    #     if f"episode_{episode+total_episode}" in file1.keys():
+    #         del file1[f"episode_{episode+total_episode}"]
+    #     g1 = file1.create_group(f"episode_{episode+total_episode}")
+    #     g1.create_dataset("obs", data=obs_chunk)
+    #     g1.create_dataset("action", data=action_chunk)
+    #     g1.create_dataset("robot_qpos", data=robot_qpos_chunk)
+    #     g1.create_dataset("sim_real_label", data=sim_real_label_chunk)
 
     return episode + total_episode + 1, obs[0], action[0], robot_qpos[0]
 

@@ -337,7 +337,7 @@ def main():
     set_entity_color([end_effector], [0, 1, 0, 0.6])
     is_initialized = False
 
-    duration = 1 / 30.0
+    duration = 1 / 45.0
     try:
         while not gui.closed:
             tic = time.time()
@@ -359,7 +359,7 @@ def main():
                 if tac - tic < duration:
                     sleep_time = duration - (tac - tic)
                     time.sleep(sleep_time)
-                    # # Data recording
+                # Data recording
                 record_data = {"robot_qpos": robot_qpos}
                 recorder.step(record_data)
 
