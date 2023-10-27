@@ -71,7 +71,8 @@ class PourBoxEnv(BaseSimulationEnv):
         else:
             print("Using Given Target Location")
             self.target_pose = init_target_pos
-        self.target_object = load_ycb_object(self.scene, self.bowl_name, static=True)
+        self.target_object = load_ycb_object(
+            self.scene, self.bowl_name, static=True)
         self.target_object.set_pose(self.target_pose)
 
         # Load box
@@ -81,7 +82,8 @@ class PourBoxEnv(BaseSimulationEnv):
 
         # Load bottle
         bottle_material = self.scene.create_physical_material(0.5, 0.3, 0.01)
-        bottle_dir = Path(__file__).parent.parent.parent.parent / "assets/misc/chip_can"
+        bottle_dir = Path(__file__).parent.parent.parent.parent / \
+            "assets/misc/chip_can"
         visual_mesh = bottle_dir / "pringles.obj"
         collision_mesh = bottle_dir / "pringles_collision.obj"
         builder = self.scene.create_actor_builder()
@@ -98,8 +100,8 @@ class PourBoxEnv(BaseSimulationEnv):
         )
         self.manipulated_object = builder.build(self.bottle_name)
 
-        # print('################################Randomizing Object Texture##########################')
-        # self.generate_random_object_texture(randomness_scale)
+        print('################################Randomizing Object Texture##########################')
+        self.generate_random_object_texture(randomness_scale)
 
     def generate_random_object_pose(self, randomness_scale):
         random.seed(self.object_seed)
@@ -109,6 +111,35 @@ class PourBoxEnv(BaseSimulationEnv):
         euler = random.uniform(np.deg2rad(0), np.deg2rad(300))
         orientation = transforms3d.euler.euler2quat(0, 0, euler)
         return sapien.Pose(position, orientation)
+
+    def generate_random_object_texture(self, randomness_scale):
+        var = 0.1 * randomness_scale
+        default_color = np.array([1, 0, 0, 1])
+        for visual in self.target_object.get_visual_bodies():
+            for geom in visual.get_render_shapes():
+                mat = geom.material
+                mat.set_base_color(default_color)
+                mat.set_specular(random.uniform(0, var))
+                mat.set_roughness(random.uniform(0.7 - var, 0.7 + var))
+                mat.set_metallic(random.uniform(0, var))
+                geom.set_material(mat)
+
+        for visual in self.manipulated_object.get_visual_bodies():
+            for geom in visual.get_render_shapes():
+                mat = geom.material
+                mat.set_specular(random.uniform(0, var))
+                mat.set_roughness(random.uniform(0.7 - var, 0.7 + var))
+                mat.set_metallic(random.uniform(0, var))
+                geom.set_material(mat)
+
+        for table in self.tables:
+            for visual in table.get_visual_bodies():
+                for geom in visual.get_render_shapes():
+                    mat = geom.material
+                    mat.set_specular(random.uniform(0, var))
+                    mat.set_roughness(random.uniform(0.7 - var, 0.7 + var))
+                    mat.set_metallic(random.uniform(0, var))
+                    geom.set_material(mat)
 
     def reset_env(self):
         init_pose = self.generate_random_object_pose(self.randomness_scale)
@@ -126,10 +157,12 @@ class PourBoxEnv(BaseSimulationEnv):
 
         # Top
         top_pose = sapien.Pose(
-            np.array([lab.TABLE_ORIGIN[0], lab.TABLE_ORIGIN[1], -table_thickness / 2])
+            np.array(
+                [lab.TABLE_ORIGIN[0], lab.TABLE_ORIGIN[1], -table_thickness / 2])
         )
         top_material = self.scene.create_physical_material(1, 0.5, 0.01)
-        table_half_size = np.concatenate([lab.TABLE_XY_SIZE / 2, [table_thickness / 2]])
+        table_half_size = np.concatenate(
+            [lab.TABLE_XY_SIZE / 2, [table_thickness / 2]])
         builder.add_box_collision(
             pose=top_pose, half_size=table_half_size, material=top_material
         )
@@ -141,7 +174,8 @@ class PourBoxEnv(BaseSimulationEnv):
             table_visual_material.set_base_color(np.array([0.9, 0.9, 0.9, 1]))
             table_visual_material.set_roughness(0.3)
 
-            leg_size = np.array([0.025, 0.025, (table_height / 2 - table_half_size[2])])
+            leg_size = np.array(
+                [0.025, 0.025, (table_height / 2 - table_half_size[2])])
             leg_height = -table_height / 2 - table_half_size[2]
             x = table_half_size[0] - 0.1
             y = table_half_size[1] - 0.1
@@ -200,7 +234,8 @@ class PourBoxEnv(BaseSimulationEnv):
             table_visual_material = self.renderer.create_material()
             table_visual_material.set_metallic(0.0)
             table_visual_material.set_specular(0.2)
-            table_visual_material.set_base_color(np.array([0, 0, 0, 255]) / 255)
+            table_visual_material.set_base_color(
+                np.array([0, 0, 0, 255]) / 255)
             table_visual_material.set_roughness(0.1)
             builder.add_box_visual(
                 pose=top_pose, half_size=table_half_size, material=table_visual_material

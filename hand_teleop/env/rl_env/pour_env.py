@@ -109,14 +109,17 @@ class PourBoxRLEnv(PourBoxEnv, BaseRLEnv):
             self.robot.set_qpos(qpos)
             self.robot.set_drive_target(qpos)
             init_pos = np.array(lab.ROBOT2BASE.p) + self.robot_info.root_offset
-            init_pose = sapien.Pose(init_pos, transforms3d.euler.euler2quat(0, 0, 0))
+            init_pose = sapien.Pose(
+                init_pos, transforms3d.euler.euler2quat(0, 0, 0))
         else:
             init_pose = sapien.Pose(
-                np.array([-0.3, 0, 0.2]), transforms3d.euler.euler2quat(0, np.pi / 2, 0)
+                np.array([-0.3, 0, 0.2]
+                         ), transforms3d.euler.euler2quat(0, np.pi / 2, 0)
             )
         self.robot.set_pose(init_pose)
         self.reset_internal()
         self.is_object_lifted = False
+        self.boxes_not_in_bowl = [i for i in range(len(self.boxes))]
         return self.get_observation()
 
     @cached_property
@@ -134,25 +137,31 @@ class PourBoxRLEnv(PourBoxEnv, BaseRLEnv):
         return 250
 
     def _num_box_in_bowl(self):
+        # contact_buffer = self.check_actor_pair_contacts(
+        #     self.boxes, self.target_object)
+        # return np.sum(contact_buffer)
         # check the contact between the box and the target
-        num_box_in_bowl = 0
         tar_pos_x = self.target_object.pose.p[0]
         tar_pos_y = self.target_object.pose.p[1]
-        for i in range(len(self.boxes)):
+        for i in self.boxes_not_in_bowl:
             box = self.boxes[i]
             # correct the box pose
-            box_world_pose = box.pose * sapien.Pose([0, 0, 0.025 * i + 0.1], box.pose.q)
-            is_bottle_contact = self.check_contact([box], [self.manipulated_object])
+            box_world_pose = box.pose * \
+                sapien.Pose([0, 0, 0.025 * i + 0.1], box.pose.q)
+            is_bottle_contact = self.check_contact(
+                [box], [self.manipulated_object])
             is_table_contact = self.check_contact([box], [self.tables])
+            is_box_still = np.linalg.norm(box.velocity) <= 1e-6
             if (
                 np.abs(box_world_pose.p[0] - tar_pos_x) < 0.0795
                 and np.abs(box_world_pose.p[1] - tar_pos_y) < 0.0795
                 and not is_table_contact
                 and not is_bottle_contact
+                and is_box_still
             ):
-                num_box_in_bowl += 1
+                self.boxes_not_in_bowl.remove(i)
 
-        return num_box_in_bowl
+        return len(self.boxes) - len(self.boxes_not_in_bowl)
 
     def _is_object_lifted(self):
         # check the x-y position of the object against the target
@@ -161,7 +170,7 @@ class PourBoxRLEnv(PourBoxEnv, BaseRLEnv):
             self.is_object_lifted = True
 
         return self.is_object_lifted
-    
+
     def _is_close_to_target(self):
         # check the x-y position of the object against the target
         object_xy = self.manipulated_object.pose.p[:-1]
