@@ -261,7 +261,7 @@ def eval_in_env(
                 )
             elif task_name == "pour":
                 aug_random_target = sapien.Pose(
-                    [0 + x2, 0.2 + y2 / 2, env.bowl_height], [1, 0, 0, 0]
+                    [0 + x2, 0.2 + y2, env.bowl_height], [1, 0, 0, 0]
                 )
             dist_xy = np.linalg.norm(
                 object_pos.p[:2] - aug_random_target.p[:2])
