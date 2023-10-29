@@ -88,6 +88,7 @@ def create_env(args, demo, retarget=False):
         env = DClawRLEnv(**env_params)
     elif task_name == 'pour':
         env = PourBoxRLEnv(**env_params)
+        meta_data["env_kwargs"]["init_target_pos"] = env.target_pose
     else:
         raise NotImplementedError
 

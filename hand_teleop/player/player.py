@@ -35,7 +35,7 @@ def handqpos2angle(hand_qpos):
     return delta_angles
 
 
-def create_env(retarget=False, idx=1):
+def create_env_test(retarget=False, idx=1):
     # Recorder
     # shutil.rmtree('./temp/demos/player', ignore_errors=True)
     # os.makedirs('./temp/demos/player')
@@ -200,8 +200,9 @@ def create_env(retarget=False, idx=1):
     return env, task_name, meta_data, baked_data
 
 
-def bake_visual_demonstration_test(retarget=False, demo_idx=6):
-    env, task_name, meta_data, baked_data = create_env(retarget=retarget, idx=demo_idx)
+
+def bake_visual_demonstration_test(retarget=False, demo_idx=29):
+    env, task_name, meta_data, baked_data = create_env_test(retarget=retarget, idx=demo_idx)
 
     robot_pose = env.robot.get_pose()
     ee_pose = baked_data["ee_pose"][0]

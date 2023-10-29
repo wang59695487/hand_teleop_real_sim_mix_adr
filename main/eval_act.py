@@ -338,7 +338,7 @@ def eval_in_env(
         success = success or info_success
         if success:
             stop_frame += 1
-        if stop_frame == 30:
+        if stop_frame == 50:
             break
 
         obs = deepcopy(next_obs)

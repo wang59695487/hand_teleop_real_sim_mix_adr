@@ -213,8 +213,7 @@ def play_one_real_sim_visual_demo(
         env = DClawRLEnv(**env_params)
     elif task_name == "pour":
         env = PourBoxRLEnv(**env_params)
-        meta_data["env_kwargs"]["init_target_pos"] = sapien.Pose(
-            [0.0, 0.2, env.bowl_height])
+        meta_data["env_kwargs"]["init_target_pos"] = env.target_pose
     else:
         raise NotImplementedError
 

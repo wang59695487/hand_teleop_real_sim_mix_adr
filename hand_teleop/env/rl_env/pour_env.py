@@ -150,12 +150,11 @@ class PourBoxRLEnv(PourBoxEnv, BaseRLEnv):
                 sapien.Pose([0, 0, 0.025 * i + 0.1], box.pose.q)
             is_bottle_contact = self.check_contact(
                 [box], [self.manipulated_object])
-            is_table_contact = self.check_contact([box], [self.tables])
             is_box_still = np.linalg.norm(box.velocity) <= 1e-6
             if (
                 np.abs(box_world_pose.p[0] - tar_pos_x) < 0.0795
                 and np.abs(box_world_pose.p[1] - tar_pos_y) < 0.0795
-                and not is_table_contact
+                and np.abs(box_world_pose.p[2]) > 0.0125
                 and not is_bottle_contact
                 and is_box_still
             ):
