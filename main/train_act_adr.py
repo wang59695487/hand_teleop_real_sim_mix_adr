@@ -53,7 +53,8 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
             args["real_dataset_folder"], args["real_batch_size"]
         )
         sim_real_ratio = (
-            Prepared_Data_Sim["total_episodes"] / Prepared_Data_Real["total_episodes"]
+            Prepared_Data_Sim["total_episodes"] /
+            Prepared_Data_Real["total_episodes"]
         )
         print("Sim_Real_Ratio: {}".format(sim_real_ratio))
 
@@ -81,11 +82,13 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
         epochs = args["num_epochs"]
         eval_freq = args["eval_freq"]
     elif current_rank > 1 and not adr_dict["is_stop"]:
-        agent.load(os.path.join(args["sim_aug_dataset_folder"], f"epoch_best.pt"))
+        agent.load(os.path.join(
+            args["sim_aug_dataset_folder"], f"epoch_best.pt"))
         epochs = 400  # 100, 200
         eval_freq = 100  # 25, 50
     elif adr_dict["is_stop"]:
-        agent.load(os.path.join(args["sim_aug_dataset_folder"], f"epoch_best.pt"))
+        agent.load(os.path.join(
+            args["sim_aug_dataset_folder"], f"epoch_best.pt"))
         epochs = 2000  # 100, 200
         eval_freq = 100  # 25, 50
 
@@ -158,18 +161,20 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
                             x = np.linspace(
                                 -0.08 - var_object[0], 0.12 + var_object[1], 5
                             )
-                            y = np.linspace(0.2 - var_object[1], 0.3 + var_object[0], 4)
+                            y = np.linspace(
+                                0.2 - var_object[1], 0.3 + var_object[0], 4)
                         elif args["task_name"] == "pour":
                             var_object = [0, 0] if rank < 4 else [0, 0.12]
                             x = np.linspace(
-                                -0.1 , 0.1 + var_object[1], 5
+                                -0.1, 0.1 + var_object[1], 5
                             )
                             y = np.linspace(
                                 -0.16 - var_object[1], -0.08, 4
                             )
                         for i in range(20):
                             eval_player.eval_start(
-                                log_dir, epoch + 1, i + 1, x[int(i / 4)], y[i % 4], rank
+                                log_dir, epoch + 1, i +
+                                1, x[int(i / 4)], y[i % 4], rank
                             )
                     elif args["task_name"] == "dclaw":
                         if rank < 3:
@@ -184,7 +189,8 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
                         y = np.linspace(var_object[1], var_object[1], 5)
                         for i in range(20):
                             eval_player.eval_start(
-                                log_dir, epoch + 1, i + 1, x[int(i / 5)], y[i % 5], rank
+                                log_dir, epoch + 1, i +
+                                1, x[int(i / 5)], y[i % 5], rank
                             )
 
                 timeout_in_seconds = 80 * args["randomness_rank"]
@@ -255,7 +261,8 @@ def main(args):
     current_rank = 1
     for iteration in range(500):
         torch.cuda.empty_cache()
-        current_rank, is_stop = train_and_aug(args, demo_files, log_dir, current_rank)
+        current_rank, is_stop = train_and_aug(
+            args, demo_files, log_dir, current_rank)
 
         if is_stop:
             ############## Final Train#################
@@ -274,8 +281,8 @@ def main(args):
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument("--real-demo-folder", default=None, type=str)
-    parser.add_argument("--sim-folder", default=None)
-    parser.add_argument("--sim-demo-folder", default=None, type=str)
+    parser.add_argument("--sim-demo-folder", default=None)
+    parser.add_argument("--sim-dataset-folder", default=None, type=str)
     parser.add_argument("--sim-aug-dataset-folder", default=None, type=str)
     parser.add_argument("--backbone-type", default="regnet_3_2gf")
     parser.add_argument("--eval-freq", default=100, type=int)
@@ -307,8 +314,8 @@ if __name__ == "__main__":
 
     args = {
         "real_dataset_folder": args.real_demo_folder,
-        "sim_dataset_folder": args.sim_demo_folder,
-        "sim_demo_folder": args.sim_folder,
+        "sim_dataset_folder": args.sim_dataset_folder,
+        "sim_demo_folder": args.sim_demo_folder,
         "sim_aug_dataset_folder": args.sim_aug_dataset_folder,
         "num_queries": args.num_queries,
         # 8192 16384 32678 65536
