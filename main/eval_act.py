@@ -293,7 +293,7 @@ def eval_in_env(
 
     obs = env.get_observation()
     success = False
-    max_time_step = 1000
+    max_time_step = 1100
     action_dim = 22
     all_time_actions = torch.zeros(
         [max_time_step, max_time_step + args["num_queries"], action_dim]

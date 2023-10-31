@@ -84,7 +84,7 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
     elif current_rank > 1 and not adr_dict["is_stop"]:
         agent.load(os.path.join(
             args["sim_aug_dataset_folder"], f"epoch_best.pt"))
-        epochs = 400  # 100, 200
+        epochs = 300  # 100, 200
         eval_freq = 100  # 25, 50
     elif adr_dict["is_stop"]:
         agent.load(os.path.join(
@@ -164,12 +164,12 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
                             y = np.linspace(
                                 0.2 - var_object[1], 0.3 + var_object[0], 4)
                         elif args["task_name"] == "pour":
-                            var_object = [0, 0] if rank < 4 else [0, 0.12]
+                            var_object = [0, 0] if rank < 4 else [0.02, 0.08]
                             x = np.linspace(
-                                -0.1, 0.1 + var_object[1], 5
+                                -0.1, 0.1 + var_object[0], 5
                             )
                             y = np.linspace(
-                                -0.16 - var_object[1], -0.08, 4
+                                -0.18 - var_object[1], -0.08 + var_object[0], 4
                             )
                         for i in range(20):
                             eval_player.eval_start(

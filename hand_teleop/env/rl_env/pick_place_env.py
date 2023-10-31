@@ -298,7 +298,7 @@ class PickPlaceRLEnv(PickPlaceEnv, BaseRLEnv):
         object_xy = self.manipulated_object.pose.p[:-1]
         target_xy = self.target_pose.p[:-1]
         dist_xy = np.linalg.norm(object_xy - target_xy)
-        close_to_target = dist_xy <= 0.2
+        close_to_target = dist_xy <= 0.18
 
         return close_to_target
 
