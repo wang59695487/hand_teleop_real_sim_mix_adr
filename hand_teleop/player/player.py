@@ -35,14 +35,14 @@ def handqpos2angle(hand_qpos):
     return delta_angles
 
 
-def create_env_test(retarget=False, idx=1):
+def create_env_test(retarget=False, idx=50):
     # Recorder
     # shutil.rmtree('./temp/demos/player', ignore_errors=True)
     # os.makedirs('./temp/demos/player')
-    # path = f"./sim/raw_data/pick_place_mustard_bottle/mustard_bottle_{idx:004d}.pickle"
+    path = f"./sim/raw_data/pick_place_mustard_bottle/mustard_bottle_{idx:004d}.pickle"
     # path = f"./sim/raw_data/dclaw/dclaw_3x_{idx:004d}.pickle"
     # path = f"sim/raw_data/pick_place_sugar_box/sugar_box_{idx:004d}.pickle"
-    path = f"sim/raw_data/pour/chip_can_{idx:004d}.pickle"
+    # path = f"sim/raw_data/pour/chip_can_{idx:004d}.pickle"
     all_data = np.load(path, allow_pickle=True)
     meta_data = all_data["meta_data"]
     task_name = meta_data["env_kwargs"]["task_name"]
@@ -70,6 +70,10 @@ def create_env_test(retarget=False, idx=1):
     env_params["robot_name"] = robot_name
     env_params["use_visual_obs"] = use_visual_obs
     env_params["use_gui"] = True
+    # env_params["object_name"] = "sugar_box"
+    # env_params["object_name"] = "bleach_cleanser"
+    # env_params["object_category"] = "SHAPE_NET"
+    # env_params["object_name"] = "bottle_1"
 
     if "CUDA_VISIBLE_DEVICES" in os.environ:
         env_params["device"] = "cuda"
@@ -120,7 +124,8 @@ def create_env_test(retarget=False, idx=1):
                         *(1 * robot_arm_control_params), mode="force"
                     )
                 else:
-                    joint.set_drive_property(*(1 * finger_control_params), mode="force")
+                    joint.set_drive_property(
+                        *(1 * finger_control_params), mode="force")
             env.rl_step = env.simple_sim_step
 
     env.reset()
@@ -131,7 +136,7 @@ def create_env_test(retarget=False, idx=1):
 
     real_camera_cfg = {
         "relocate_view": dict(
-            pose=lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(224, 224)
+            pose=lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(640, 480)
         )
     }
 
@@ -139,7 +144,8 @@ def create_env_test(retarget=False, idx=1):
 
     # Specify modality
     empty_info = {}  # level empty dict for now, reserved for future
-    camera_info = {"relocate_view": {"rgb": empty_info, "segmentation": empty_info}}
+    camera_info = {"relocate_view": {
+        "rgb": empty_info, "segmentation": empty_info}}
     env.setup_visual_obs_config(camera_info)
     # Player
     if task_name == "pick_place":
@@ -171,7 +177,8 @@ def create_env_test(retarget=False, idx=1):
             "link_10.0",
         ]
         indices = [0, 1, 2, 3, 5, 6, 7, 8]
-        joint_names = [joint.get_name() for joint in env.robot.get_active_joints()]
+        joint_names = [joint.get_name()
+                       for joint in env.robot.get_active_joints()]
         retargeting = PositionRetargeting(
             env.robot,
             joint_names,
@@ -200,18 +207,18 @@ def create_env_test(retarget=False, idx=1):
     return env, task_name, meta_data, baked_data
 
 
-
-def bake_visual_demonstration_test(retarget=False, demo_idx=29):
-    env, task_name, meta_data, baked_data = create_env_test(retarget=retarget, idx=demo_idx)
+def bake_visual_demonstration_test(retarget=False):
+    env, task_name, meta_data, baked_data = create_env_test(
+        retarget=retarget)
 
     robot_pose = env.robot.get_pose()
     ee_pose = baked_data["ee_pose"][0]
-    hand_qpos_prev = baked_data["action"][0][env.arm_dof :]
+    hand_qpos_prev = baked_data["action"][0][env.arm_dof:]
 
     frame_skip = 1
     rgb_pics = []
 
-    #################################Kinematic Augmentation####################################
+    ################################# Kinematic Augmentation####################################
     init_pose_aug_dict = {
         "init_pose_aug_obj": sapien.Pose([0, 0, 0], [1, 0, 0, 0]),
         "init_pose_aug_target": sapien.Pose([0, 0, 0], [1, 0, 0, 0]),
@@ -223,9 +230,9 @@ def bake_visual_demonstration_test(retarget=False, demo_idx=29):
         init_pose_aug_obj * meta_data["env_kwargs"]["init_obj_pos"]
     )
     env.manipulated_object.set_pose(meta_data["env_kwargs"]["init_obj_pos"])
-    meta_data["env_kwargs"]["init_target_pos"] = sapien.Pose(
-        [0.0, 0.2, env.bowl_height]
-    )
+    # meta_data["env_kwargs"]["init_target_pos"] = sapien.Pose(
+    #     [0.0, 0.2, env.bowl_height]
+    # )
     if task_name in ["pick_place", "pour"]:
         init_pose_aug_target = init_pose_aug_dict["init_pose_aug_target"]
         meta_data["env_kwargs"]["init_target_pos"] = (
@@ -274,14 +281,15 @@ def bake_visual_demonstration_test(retarget=False, demo_idx=29):
         # NOTE: robot.get_qpos() version
         if idx < len(baked_data["obs"]) - frame_skip:
             ee_pose_next = baked_data["ee_pose"][idx + frame_skip]
-            ee_pose_delta = np.sqrt(np.sum((ee_pose_next[:3] - ee_pose[:3]) ** 2))
-            hand_qpos = baked_data["action"][idx][env.arm_dof :]
+            ee_pose_delta = np.sqrt(
+                np.sum((ee_pose_next[:3] - ee_pose[:3]) ** 2))
+            hand_qpos = baked_data["action"][idx][env.arm_dof:]
             delta_hand_qpos = hand_qpos - hand_qpos_prev if idx != 0 else hand_qpos
 
             if (
                 ee_pose_delta < 0.001
                 and np.mean(handqpos2angle(delta_hand_qpos)) <= 1.2
-                and task_name in ["pick_place", "dclaw"]
+                and task_name in ["dclaw"]
             ):
                 continue
 
@@ -332,7 +340,8 @@ def bake_visual_demonstration_test(retarget=False, demo_idx=29):
                     palm_pose.to_transformation_matrix()[:3, :3] @ delta_axis
                 )
                 delta_pose = np.concatenate(
-                    [palm_next_pose.p - palm_pose.p, delta_axis_world * delta_angle]
+                    [palm_next_pose.p - palm_pose.p,
+                        delta_axis_world * delta_angle]
                 )
 
                 palm_jacobian = env.kinematic_model.compute_end_link_spatial_jacobian(
@@ -351,10 +360,17 @@ def bake_visual_demonstration_test(retarget=False, demo_idx=29):
                 _, _, _, info = env.step(target_qpos)
                 env.render()
                 print(valid_frame)
-                print(info["num_box_in_bowl"])
-                rgb = env.get_observation()["relocate_view-rgb"].cpu().detach().numpy()
+                print(info["success"])
+                rgb = env.get_observation(
+                )["relocate_view-rgb"].cpu().detach().numpy()
                 rgb_pic = (rgb * 255).astype(np.uint8)
                 rgb_pics.append(rgb_pic)
+    # object_name = meta_data["env_kwargs"]["object_name"]
+    # imageio.mimsave(
+    #     f"./temp/demos/player/pick_place-rgb_{object_name}.mp4",
+    #     rgb_pics,
+    #     fps=180,
+    # )
 
     # # assign weights for action chunk
     # total_frame = len(visual_baked["obs"])
@@ -578,7 +594,8 @@ def bake_visual_real_demonstration_test(retarget=False):
                         *(1 * robot_arm_control_params), mode="force"
                     )
                 else:
-                    joint.set_drive_property(*(1 * finger_control_params), mode="force")
+                    joint.set_drive_property(
+                        *(1 * finger_control_params), mode="force")
             env.rl_step = env.simple_sim_step
     env.reset()
     viewer = env.render()
@@ -610,7 +627,8 @@ def bake_visual_real_demonstration_test(retarget=False):
 
     # Specify modality
     empty_info = {}  # level empty dict for now, reserved for future
-    camera_info = {"relocate_view": {"rgb": empty_info, "segmentation": empty_info}}
+    camera_info = {"relocate_view": {
+        "rgb": empty_info, "segmentation": empty_info}}
     env.setup_visual_obs_config(camera_info)
 
     # Player
@@ -656,7 +674,8 @@ def bake_visual_real_demonstration_test(retarget=False):
             "link_10.0",
         ]
         indices = [0, 1, 2, 3, 5, 6, 7, 8]
-        joint_names = [joint.get_name() for joint in env.robot.get_active_joints()]
+        joint_names = [joint.get_name()
+                       for joint in env.robot.get_active_joints()]
         retargeting = PositionRetargeting(
             env.robot,
             joint_names,
@@ -716,11 +735,12 @@ def bake_visual_real_demonstration_test(retarget=False):
     robot_pose = env.robot.get_pose()
     rotation_matrix = transforms3d.quaternions.quat2mat(robot_pose.q)
     world_to_robot = transforms3d.affines.compose(
-        -np.matmul(rotation_matrix.T, robot_pose.p), rotation_matrix.T, np.ones(3)
+        -np.matmul(rotation_matrix.T,
+                   robot_pose.p), rotation_matrix.T, np.ones(3)
     )
 
     ee_pose = baked_data[0]["ee_pose"]
-    hand_qpos_prev = baked_data[0]["teleop_cmd"][env.arm_dof :]
+    hand_qpos_prev = baked_data[0]["teleop_cmd"][env.arm_dof:]
 
     frame_skip = 1
     rgb_pics = []
@@ -728,8 +748,9 @@ def bake_visual_real_demonstration_test(retarget=False):
         # NOTE: robot.get_qpos() version
         if idx < len(baked_data) - frame_skip:
             ee_pose_next = np.array(baked_data[idx + frame_skip]["ee_pose"])
-            ee_pose_delta = np.sqrt(np.sum((ee_pose_next[:3] - ee_pose[:3]) ** 2))
-            hand_qpos = baked_data[idx]["teleop_cmd"][env.arm_dof :]
+            ee_pose_delta = np.sqrt(
+                np.sum((ee_pose_next[:3] - ee_pose[:3]) ** 2))
+            hand_qpos = baked_data[idx]["teleop_cmd"][env.arm_dof:]
             delta_hand_qpos = hand_qpos - hand_qpos_prev if idx != 0 else hand_qpos
 
             object_pose = env.manipulated_object.pose.p
@@ -749,7 +770,8 @@ def bake_visual_real_demonstration_test(retarget=False):
 
                 palm_pose = robot_pose.inv() * palm_pose
 
-                palm_next_pose = sapien.Pose(ee_pose_next[0:3], ee_pose_next[3:7])
+                palm_next_pose = sapien.Pose(
+                    ee_pose_next[0:3], ee_pose_next[3:7])
                 palm_next_pose = robot_pose.inv() * palm_next_pose
 
                 palm_delta_pose = palm_pose.inv() * palm_next_pose
@@ -763,7 +785,8 @@ def bake_visual_real_demonstration_test(retarget=False):
                     palm_pose.to_transformation_matrix()[:3, :3] @ delta_axis
                 )
                 delta_pose = np.concatenate(
-                    [palm_next_pose.p - palm_pose.p, delta_axis_world * delta_angle]
+                    [palm_next_pose.p - palm_pose.p,
+                        delta_axis_world * delta_angle]
                 )
 
                 palm_jacobian = env.kinematic_model.compute_end_link_spatial_jacobian(
@@ -787,11 +810,13 @@ def bake_visual_real_demonstration_test(retarget=False):
                 _, _, _, info = env.step(target_qpos)
                 env.render()
 
-                rgb = env.get_observation()["relocate_view-rgb"].cpu().detach().numpy()
+                rgb = env.get_observation(
+                )["relocate_view-rgb"].cpu().detach().numpy()
                 rgb_pic = (rgb * 255).astype(np.uint8)
                 rgb_pics.append(rgb_pic)
 
-        imageio.mimsave("./temp/demos/player/relocate-rgb.mp4", rgb_pics, fps=30)
+        imageio.mimsave("./temp/demos/player/relocate-rgb.mp4",
+                        rgb_pics, fps=30)
 
 
 if __name__ == "__main__":

@@ -14,6 +14,7 @@ from hand_teleop.utils.ycb_object_utils import (
     YCB_ORIENTATION,
 )
 from hand_teleop.utils.egad_object_utils import load_egad_object, EGAD_NAME
+from hand_teleop.utils.shapenet_object_utils import load_shapenet_object
 
 
 class PickPlaceEnv(BaseSimulationEnv):
@@ -43,16 +44,12 @@ class PickPlaceEnv(BaseSimulationEnv):
         self.object_category = object_category
         self.object_name = object_name
         self.object_scale = object_scale
-        self.object_height = object_scale * YCB_SIZE[self.object_name][2] / 2
         self.object_seed = object_seed
 
         # Dynamics info
         if init_obj_pos is None:
             self.init_pose = self.generate_random_object_pose(randomness_scale)
             print("Randomizing Object Location")
-            # print('Object Seed', self.object_seed)
-            # print('Object Scale', self.object_scale)
-            # print('Object Height', self.object_height)
             print("Object Location", self.init_pose)
         else:
             print("Using Given Object Location")
@@ -80,7 +77,8 @@ class PickPlaceEnv(BaseSimulationEnv):
         self.target_object = load_ycb_object(self.scene, "plate", static=True)
         if init_target_pos is None:
             print("Randomizing Target Location")
-            self.target_pose = self.generate_random_target_pose(randomness_scale)
+            self.target_pose = self.generate_random_target_pose(
+                randomness_scale)
         else:
             print("Using Given Target Location")
             self.target_pose = init_target_pos
@@ -88,10 +86,22 @@ class PickPlaceEnv(BaseSimulationEnv):
 
         # Load object
         if self.object_category.lower() == "ycb":
+            self.object_height = object_scale * \
+                YCB_SIZE[self.object_name][2] / 2
             self.manipulated_object = load_ycb_object(self.scene, object_name)
-            self.manipulated_object.set_pose(self.init_pose)
+
+        elif self.object_category.lower() == "shape_net":
+            # Load bottle
+            object_class = self.object_name.split("_")[0]
+            object_id = self.object_name.split("_")[1]
+            if object_class == "bottle":
+                cat_id = "02876657"
+            self.manipulated_object, self.object_height = load_shapenet_object(
+                self.scene, cat_id, object_id)
+
         else:
             raise NotImplementedError
+        self.manipulated_object.set_pose(self.init_pose)
 
         self.generate_random_object_texture(randomness_scale)
 
@@ -157,10 +167,12 @@ class PickPlaceEnv(BaseSimulationEnv):
 
         # Top
         top_pose = sapien.Pose(
-            np.array([lab.TABLE_ORIGIN[0], lab.TABLE_ORIGIN[1], -table_thickness / 2])
+            np.array(
+                [lab.TABLE_ORIGIN[0], lab.TABLE_ORIGIN[1], -table_thickness / 2])
         )
         top_material = self.scene.create_physical_material(1, 0.5, 0.01)
-        table_half_size = np.concatenate([lab.TABLE_XY_SIZE / 2, [table_thickness / 2]])
+        table_half_size = np.concatenate(
+            [lab.TABLE_XY_SIZE / 2, [table_thickness / 2]])
         builder.add_box_collision(
             pose=top_pose, half_size=table_half_size, material=top_material
         )
@@ -172,7 +184,8 @@ class PickPlaceEnv(BaseSimulationEnv):
             table_visual_material.set_base_color(np.array([0.9, 0.9, 0.9, 1]))
             table_visual_material.set_roughness(0.3)
 
-            leg_size = np.array([0.025, 0.025, (table_height / 2 - table_half_size[2])])
+            leg_size = np.array(
+                [0.025, 0.025, (table_height / 2 - table_half_size[2])])
             leg_height = -table_height / 2 - table_half_size[2]
             x = table_half_size[0] - 0.1
             y = table_half_size[1] - 0.1
@@ -231,7 +244,8 @@ class PickPlaceEnv(BaseSimulationEnv):
             table_visual_material = self.renderer.create_material()
             table_visual_material.set_metallic(0.0)
             table_visual_material.set_specular(0.2)
-            table_visual_material.set_base_color(np.array([0, 0, 0, 255]) / 255)
+            table_visual_material.set_base_color(
+                np.array([0, 0, 0, 255]) / 255)
             table_visual_material.set_roughness(0.1)
             builder.add_box_visual(
                 pose=top_pose, half_size=table_half_size, material=table_visual_material

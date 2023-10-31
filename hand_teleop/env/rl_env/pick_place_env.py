@@ -108,7 +108,8 @@ class PickPlaceRLEnv(PickPlaceEnv, BaseRLEnv):
             # velocity_limit = np.array([1.0] * 3 + [1.57] * 3 + [3.14] * (self.robot.dof - 6))
             # self.velocity_limit = np.stack([-velocity_limit, velocity_limit], axis=1)
             init_pose = sapien.Pose(
-                np.array([-0.3, 0, 0.2]), transforms3d.euler.euler2quat(0, np.pi / 2, 0)
+                np.array([-0.3, 0, 0.2]
+                         ), transforms3d.euler.euler2quat(0, np.pi / 2, 0)
             )
             self.robot.set_pose(init_pose)
             self.arm_dof = 0
@@ -211,11 +212,13 @@ class PickPlaceRLEnv(PickPlaceEnv, BaseRLEnv):
             self.robot.set_qpos(qpos)
             self.robot.set_drive_target(qpos)
             init_pos = np.array(lab.ROBOT2BASE.p) + self.robot_info.root_offset
-            init_pose = sapien.Pose(init_pos, transforms3d.euler.euler2quat(0, 0, 0))
+            init_pose = sapien.Pose(
+                init_pos, transforms3d.euler.euler2quat(0, 0, 0))
             # init_pose = sapien.Pose(np.array([-0.55, 0, 0.17145]), transforms3d.euler.euler2quat(0, 0, 0))
         else:
             init_pose = sapien.Pose(
-                np.array([-0.3, 0, 0.2]), transforms3d.euler.euler2quat(0, np.pi / 2, 0)
+                np.array([-0.3, 0, 0.2]
+                         ), transforms3d.euler.euler2quat(0, np.pi / 2, 0)
             )
         self.robot.set_pose(init_pose)
         self.reset_internal()
