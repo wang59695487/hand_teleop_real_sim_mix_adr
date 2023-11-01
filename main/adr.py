@@ -14,35 +14,38 @@ from argparse import ArgumentParser
 
 def aug_in_adr(args, current_rank, demo_files):
     if current_rank > 1:
+        is_aug_meta = False
         for file_name in os.listdir(args["sim_aug_dataset_folder"]):
             if "meta_data.pickle" in file_name:
-                meta_data_path = f"{args['sim_aug_dataset_folder']}/meta_data.pickle"
-                with open(meta_data_path, "rb") as file:
-                    all_meta_data = pickle.load(file)
-                last_total_episodes = all_meta_data["total_episodes"]
-                total_episodes = last_total_episodes
-                init_obj_poses = all_meta_data["init_obj_poses"]
-                last_best_success = all_meta_data["best_success"]
-                var_adr_light = all_meta_data["var_adr_light"]
-                var_adr_target = all_meta_data["var_adr_target"]
-                var_adr_object = all_meta_data["var_adr_object"]
-                is_var_adr = all_meta_data["is_var_adr"]
-                is_stop = all_meta_data["is_stop"]
-                break
-            else:
-                ############## Initialize the ADR parameters#################
-                last_total_episodes = 0
-                total_episodes = 0
-                init_obj_poses = []
-                var_adr_light = 1
-                var_adr_target = 0.04
-                var_adr_object = 0.04
-                is_var_adr = True
-                is_stop = False
-                meta_data_path = f"{args['sim_dataset_folder']}/meta_data.pickle"
-                with open(meta_data_path, "rb") as file:
-                    all_meta_data = pickle.load(file)
-                last_best_success = all_meta_data["best_success"]
+                is_aug_meta = True
+
+        if is_aug_meta:
+            meta_data_path = f"{args['sim_aug_dataset_folder']}/meta_data.pickle"
+            with open(meta_data_path, "rb") as file:
+                all_meta_data = pickle.load(file)
+            last_total_episodes = all_meta_data["total_episodes"]
+            total_episodes = last_total_episodes
+            init_obj_poses = all_meta_data["init_obj_poses"]
+            last_best_success = all_meta_data["best_success"]
+            var_adr_light = all_meta_data["var_adr_light"]
+            var_adr_target = all_meta_data["var_adr_target"]
+            var_adr_object = all_meta_data["var_adr_object"]
+            is_var_adr = all_meta_data["is_var_adr"]
+            is_stop = all_meta_data["is_stop"]
+        else:
+            ############## Initialize the ADR parameters#################
+            last_total_episodes = 0
+            total_episodes = 0
+            init_obj_poses = []
+            var_adr_light = 1
+            var_adr_target = 0.04
+            var_adr_object = 0.04
+            is_var_adr = True
+            is_stop = False
+            meta_data_path = f"{args['sim_dataset_folder']}/meta_data.pickle"
+            with open(meta_data_path, "rb") as file:
+                all_meta_data = pickle.load(file)
+            last_best_success = all_meta_data["best_success"]
 
         print("Replaying the sim demos and augmenting the dataset:")
         print("---------------------")
@@ -54,10 +57,11 @@ def aug_in_adr(args, current_rank, demo_files):
             for _, file_name in enumerate(demo_files):
                 print(file_name)
                 demo_idx = file_name.split("/")[-1].split(".")[0]
-                if args["task_name"] in ["pick_place","pour"]:
+                if args["task_name"] in ["pick_place", "pour"]:
                     var_obj = var_adr_object if current_rank >= 4 else 0
                     if args["task_name"] == "pick_place":
-                        x1, y1 = np.random.uniform(-0.02 - var_obj, 0.02 + var_obj, 2)
+                        x1, y1 = np.random.uniform(-0.02 -
+                                                   var_obj, 0.02 + var_obj, 2)
                     elif args["task_name"] == "pour":
                         x1 = np.random.uniform(-0.02 - var_obj, 0.02 + var_obj)
                         y1 = np.random.uniform(-0.02 - var_obj*2, 0.02)
@@ -67,14 +71,17 @@ def aug_in_adr(args, current_rank, demo_files):
 
                     var_target = var_adr_target if current_rank >= 3 else 0
                     if args["task_name"] == "pick_place":
-                        x2 = np.random.uniform(-0.02 - var_target, 0.02 + var_target)
+                        x2 = np.random.uniform(-0.02 -
+                                               var_target, 0.02 + var_target)
                         y2 = np.random.uniform(-0.02 - var_target * 2, 0.02)
                     elif args["task_name"] == "pour":
-                        x2 = np.random.uniform(-0.02 - var_target, 0.02 + var_target)
+                        x2 = np.random.uniform(-0.02 -
+                                               var_target, 0.02 + var_target)
                         y2 = np.random.uniform(0, 0.02 + var_target)
                     if np.fabs(x2) <= 0.01 and np.fabs(y2) <= 0.01:
                         continue
-                    init_pose_aug_target = sapien.Pose([x2, y2, 0], [1, 0, 0, 0])
+                    init_pose_aug_target = sapien.Pose(
+                        [x2, y2, 0], [1, 0, 0, 0])
 
                 elif args["task_name"] == "dclaw":
                     var_obj = var_adr_object if current_rank >= 3 else 0
@@ -163,7 +170,7 @@ def adr(args, current_rank, adr_dict):
                 adr_dict["var_adr_light"] = 2.6
                 current_rank += 1
 
-        elif current_rank == 3 and args["task_name"] in ["pick_place","pour"]:
+        elif current_rank == 3 and args["task_name"] in ["pick_place", "pour"]:
             adr_dict["var_adr_target"] = (
                 adr_dict["var_adr_target"] + 0.04
                 if adr_dict["is_var_adr"]
@@ -173,7 +180,7 @@ def adr(args, current_rank, adr_dict):
                 adr_dict["var_adr_target"] = 0.2
                 current_rank += 1
 
-        elif current_rank == 4 and args["task_name"] in ["pick_place","pour"]:
+        elif current_rank == 4 and args["task_name"] in ["pick_place", "pour"]:
             adr_dict["var_adr_object"] = (
                 adr_dict["var_adr_object"] + 0.04
                 if adr_dict["is_var_adr"]

@@ -14,7 +14,7 @@ from hand_teleop.utils.ycb_object_utils import (
     YCB_ORIENTATION,
 )
 from hand_teleop.utils.egad_object_utils import load_egad_object, EGAD_NAME
-from hand_teleop.utils.shapenet_object_utils import load_shapenet_object
+from hand_teleop.utils.shapenet_object_utils import load_shapenet_object, COLOR_LIST
 
 
 class PickPlaceEnv(BaseSimulationEnv):
@@ -151,6 +151,11 @@ class PickPlaceEnv(BaseSimulationEnv):
         for visual in self.manipulated_object.get_visual_bodies():
             for geom in visual.get_render_shapes():
                 mat = geom.material
+                if self.object_category.lower() == "shape_net":
+                    color = COLOR_LIST[np.random.randint(
+                        0, len(COLOR_LIST))] * random.uniform(var, 1)
+                    color[-1] = 1
+                    mat.set_base_color(color)
                 mat.set_specular(random.uniform(0, var))
                 mat.set_roughness(random.uniform(0.7 - var, 0.7 + var))
                 mat.set_metallic(random.uniform(0, var))

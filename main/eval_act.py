@@ -79,6 +79,13 @@ def create_env(args):
         env_params["init_target_pos"] = meta_data["env_kwargs"]["init_target_pos"]
 
     if task_name == "pick_place":
+        bottle_id = np.random.randint(0, 10)
+        if bottle_id == 9:
+            env_params["object_category"] = "YCB"
+            env_params["object_name"] = "mustard_bottle"
+        else:
+            env_params["object_category"] = "SHAPE_NET"
+            env_params["object_name"] = "bottle_{}".format(bottle_id)
         env = PickPlaceRLEnv(**env_params)
     elif task_name == "dclaw":
         env = DClawRLEnv(**env_params)

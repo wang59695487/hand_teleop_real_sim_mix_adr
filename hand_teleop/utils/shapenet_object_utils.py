@@ -5,6 +5,14 @@ import numpy as np
 import sapien.core as sapien
 
 SHAPENET_CAT = ["02876657", "02946921", "03797390"]
+COLOR_LIST = [
+    np.array([1, 0, 0, 1]),
+    np.array([0, 1, 0, 1]),
+    np.array([0, 0, 1, 1]),
+    np.array([1, 1, 0, 1]),
+    np.array([1, 0, 1, 1]),
+    np.array([0, 1, 1, 1])
+]
 
 
 def get_shapenet_root_dir():
