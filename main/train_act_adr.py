@@ -98,7 +98,7 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
     eval_player = Eval_player(num_workers=10, args=args, policy=agent.policy)
     best_success = 0
     min_loss = 1
-
+    torch.cuda.empty_cache()
     for epoch in range(epochs):
         print("  ", "Epoch: ", epoch)
         agent.policy.train()

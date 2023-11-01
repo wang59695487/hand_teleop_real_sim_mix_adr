@@ -102,7 +102,6 @@ def aug_in_adr(args, current_rank, demo_files):
                 total_episodes, _, _, _ = stack_and_save_frames_aug(
                     visual_baked, total_episodes, args, file1
                 )
-                torch.cuda.empty_cache()
                 if aug[current_rank] <= 0:
                     break
 
