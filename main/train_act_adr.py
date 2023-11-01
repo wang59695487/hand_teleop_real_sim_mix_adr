@@ -166,7 +166,7 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
                         elif args["task_name"] == "pour":
                             var_object = [0, 0] if rank < 4 else [0.02, 0.08]
                             x = np.linspace(
-                                -0.1, 0.1 + var_object[0], 5
+                                -0.08, 0.12 + var_object[0], 5
                             )
                             y = np.linspace(
                                 -0.18 - var_object[1], -0.08 + var_object[0], 4
