@@ -14,7 +14,7 @@ from hand_teleop.utils.ycb_object_utils import (
     YCB_ORIENTATION,
 )
 from hand_teleop.utils.egad_object_utils import load_egad_object, EGAD_NAME
-from hand_teleop.utils.shapenet_object_utils import load_shapenet_object, COLOR_LIST
+from hand_teleop.utils.shapenet_object_utils import load_shapenet_object, get_shapenet_root_dir, COLOR_LIST
 
 
 class PickPlaceEnv(BaseSimulationEnv):
@@ -159,6 +159,9 @@ class PickPlaceEnv(BaseSimulationEnv):
                 mat.set_specular(random.uniform(0, var))
                 mat.set_roughness(random.uniform(0.7 - var, 0.7 + var))
                 mat.set_metallic(random.uniform(0, var))
+                texture_path = get_shapenet_root_dir() / "textures" / \
+                    f"texture_{np.random.randint(0, 30)}.png"
+                mat.set_diffuse_texture_from_file(str(texture_path))
                 geom.set_material(mat)
 
     def reset_env(self):

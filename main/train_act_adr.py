@@ -216,7 +216,7 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
                 ################# Calculate the average success#################
                 avg_success = avg_success / args["randomness_rank"]
                 metrics["avg_success"] = avg_success
-                if avg_success > best_success:
+                if avg_success >= best_success:
                     best_success = avg_success
                     if best_success > adr_dict["last_best_success"]:
                         agent.save(

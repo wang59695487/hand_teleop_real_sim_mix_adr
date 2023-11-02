@@ -295,6 +295,7 @@ def eval_in_env(
                     sapien.Pose([0, 0.2, env.bowl_height], [1, 0, 0, 0])
                 )
     elif task_name == "dclaw":
+        env.object_total_rotate_angle = 0
         env.object_angle = env.get_object_rotate_angle()
 
     for _ in range(10 * env.frame_skip):
