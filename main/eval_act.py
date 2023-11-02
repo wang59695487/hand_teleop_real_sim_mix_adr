@@ -294,6 +294,8 @@ def eval_in_env(
                 env.target_object.set_pose(
                     sapien.Pose([0, 0.2, env.bowl_height], [1, 0, 0, 0])
                 )
+    elif task_name == "dclaw":
+        env.object_angle = env.get_object_rotate_angle()
 
     for _ in range(10 * env.frame_skip):
         env.scene.step()
@@ -345,6 +347,8 @@ def eval_in_env(
         success = success or info_success
         if success:
             stop_frame += 1
+            if task_name in ["dclaw"]:
+                break
         if stop_frame == 50:
             break
 

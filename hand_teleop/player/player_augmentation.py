@@ -208,7 +208,7 @@ def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_target, in
         one_step_aug_target = np.array([(-1*init_pose_aug_obj.p[0]+init_pose_aug_target.p[0]) /
                                        aug_step_target, (-1*init_pose_aug_obj.p[1]+init_pose_aug_target.p[1])/aug_step_target])
     elif task_name == 'dclaw':
-        aug_step_obj = 50
+        aug_step_obj = 100
 
     meta_data["env_kwargs"]['init_obj_pos'] = init_pose_aug_obj * \
         meta_data["env_kwargs"]['init_obj_pos']
@@ -220,6 +220,9 @@ def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_target, in
     ################# Avoid the case that the object is already close to the target or there is no chunk for augmentation################
     if (task_name in ["pick_place", "pour"] and env._is_close_to_target()):
         return visual_baked, meta_data, False
+    elif task_name == 'dclaw':
+        env.object_total_rotate_angle = 0
+        env.object_angle = env.get_object_rotate_angle()
 
     aug_obj = np.array([0, 0])
     one_step_aug_obj = np.array(
@@ -284,6 +287,7 @@ def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_target, in
             rgb_pic = (rgb * 255).astype(np.uint8)
             rgb_pics.append(rgb_pic)
 
+    ee_pose = baked_data["ee_pose"][start_idx]
     for idx in tqdm(range(start_idx+1, len(baked_data["obs"]), frame_skip)):
         # NOTE: robot.get_qpos() version
         if idx < len(baked_data['obs'])-frame_skip:
@@ -293,7 +297,7 @@ def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_target, in
             hand_qpos = baked_data["action"][idx][env.arm_dof:]
             delta_hand_qpos = hand_qpos - hand_qpos_prev if idx != 0 else hand_qpos
 
-            if ee_pose_delta < 0.001 and np.mean(handqpos2angle(delta_hand_qpos)) <= 1.2 and task_name in ['pick_place', 'dclaw']:
+            if ee_pose_delta < 0.001 and np.mean(handqpos2angle(delta_hand_qpos)) <= 1.2 and task_name in ['dclaw']:
                 continue
 
             else:
@@ -368,6 +372,8 @@ def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_target, in
                 info_success = info['success']
 
                 if info_success:
+                    if task_name in ["dclaw"]:
+                        break
                     stop_frame += 1
 
                 if stop_frame >= 30:
@@ -393,15 +399,15 @@ def player_augmenting(args):
     print('Augmenting sim demos and creating the dataset:')
     print('---------------------')
 
-    for demo_id, file_name in enumerate(demo_files):
-        demo_idx = file_name.split("/")[-1].split(".")[0]
-        num_test = 0
-        # if demo_id <= 5:
-        #     continue
-        with open(file_name, 'rb') as file:
-            demo = pickle.load(file)
+    for i in range(400):
+        for demo_id, file_name in enumerate(demo_files):
+            demo_idx = file_name.split("/")[-1].split(".")[0]
+            num_test = 0
+            # if demo_id <= 5:
+            #     continue
+            with open(file_name, 'rb') as file:
+                demo = pickle.load(file)
 
-        for i in range(400):
             if args['task_name'] in ['pick_place', 'dclaw']:
                 x1, x2, y1, y2 = np.random.uniform(-0.12, 0.12, 4)
             elif args['task_name'] == 'pour':
@@ -420,14 +426,14 @@ def player_augmenting(args):
             out_folder = f"./sim/raw_augmentation_action/{args['task_name']}_{args['object_name']}_aug/"
             os.makedirs(out_folder, exist_ok=True)
 
-            init_pose_aug_obj = sapien.Pose([x1, y1, 0], [1, 0, 0, 0])
+            init_pose_aug_obj = sapien.Pose([-0.16, 0.3, 0], [1, 0, 0, 0])
             init_pose_aug_target = sapien.Pose([x2, y2, 0], [1, 0, 0, 0])
 
             info_success, video = generate_sim_aug_in_play_demo(
                 args, all_data, demo_idx, init_pose_aug_target, init_pose_aug_obj, var_adr_light=2, is_video=True)
-            imageio.mimsave(
-                f"./temp/demos/aug_{args['object_name']}/demo_{demo_id+1}_{num_test}_x1{x1:.2f}_y1{y1:.2f}_x2{x2:.2f}_y2{y2:.2f}.mp4", video, fps=120)
-            print(info_success)
+            # imageio.mimsave(
+            #     f"./temp/demos/aug_{args['object_name']}/demo_{demo_id+1}_{num_test}_x1{x1:.2f}_y1{y1:.2f}_x2{x2:.2f}_y2{y2:.2f}.mp4", video, fps=120)
+            # print(info_success)
             if info_success:
 
                 print("##############SUCCESS##############")

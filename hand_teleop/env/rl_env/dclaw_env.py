@@ -7,7 +7,7 @@ import transforms3d
 from sapien.utils import Viewer
 
 from hand_teleop.env.rl_env.base import BaseRLEnv
-from hand_teleop.env.sim_env.constructor import add_default_scene_light,random_scene_light,random_environment_map
+from hand_teleop.env.sim_env.constructor import add_default_scene_light, random_scene_light, random_environment_map
 from hand_teleop.env.sim_env.dclaw_env import DClawEnv
 from hand_teleop.kinematics.mano_robot_hand import MANORobotHand
 from hand_teleop.real_world import lab
@@ -16,9 +16,10 @@ from hand_teleop.utils.common_robot_utils import generate_free_robot_hand_info, 
 
 class DClawRLEnv(DClawEnv, BaseRLEnv):
     def __init__(self, use_gui=False, frame_skip=5, robot_name="adroit_hand_free", constant_object_state=False,
-                 rotation_reward_weight=0, object_name="dclaw_3x", object_seed = 0, object_scale=1, randomness_scale=1, friction=1,
+                 rotation_reward_weight=0, object_name="dclaw_3x", object_seed=0, object_scale=1, randomness_scale=1, friction=1,
                  object_pose_noise=0.01, zero_joint_pos=None, **renderer_kwargs):
-        super().__init__(use_gui, frame_skip, object_name, object_scale, randomness_scale, friction, **renderer_kwargs)
+        super().__init__(use_gui, frame_skip, object_name, object_scale,
+                         randomness_scale, friction, **renderer_kwargs)
 
         if robot_name != "mano":
             self.setup(robot_name)
@@ -43,17 +44,18 @@ class DClawRLEnv(DClawEnv, BaseRLEnv):
         else:
             info = generate_arm_robot_hand_info()[robot_name]
         self.palm_link_name = info.palm_name
-        self.palm_link = [link for link in self.robot.get_links() if link.get_name() == self.palm_link_name][0]
+        self.palm_link = [link for link in self.robot.get_links(
+        ) if link.get_name() == self.palm_link_name][0]
 
         # Object init pose
         self.object_episode_init_pose = sapien.Pose()
         print(f"###############################Add Default Scene Light####################################")
         add_default_scene_light(self.scene, self.renderer)
 
-    def random_map(self,randomness_scale=1):
+    def random_map(self, randomness_scale=1):
         random_environment_map(self.scene, randomness_scale)
-        
-    def random_light(self,randomness_scale=1):
+
+    def random_light(self, randomness_scale=1):
         print(f"###############################Random Scene Light####################################")
         random_scene_light(self.scene, self.renderer, randomness_scale)
 
@@ -68,12 +70,14 @@ class DClawRLEnv(DClawEnv, BaseRLEnv):
             info = generate_free_robot_hand_info()["mano_hand_free"]
             # velocity_limit = np.array([1.0] * 3 + [1.57] * 3 + [3.14] * (self.robot.dof - 6))
             # self.velocity_limit = np.stack([-velocity_limit, velocity_limit], axis=1)
-            init_pose = sapien.Pose(np.array([-0.3, 0, 0.2]), transforms3d.euler.euler2quat(0, np.pi / 2, 0))
+            init_pose = sapien.Pose(
+                np.array([-0.3, 0, 0.2]), transforms3d.euler.euler2quat(0, np.pi / 2, 0))
             self.robot.set_pose(init_pose)
             self.arm_dof = 0
 
         self.robot_info = info
-        self.robot_collision_links = [link for link in self.robot.get_links() if len(link.get_collision_shapes()) > 0]
+        self.robot_collision_links = [
+            link for link in self.robot.get_links() if len(link.get_collision_shapes()) > 0]
         self.control_time_step = self.scene.get_timestep() * self.frame_skip
 
         # Choose different step function
@@ -107,7 +111,8 @@ class DClawRLEnv(DClawEnv, BaseRLEnv):
     def get_robot_state(self):
         robot_qpos_vec = self.robot.get_qpos()
         ee_pose = self.ee_link.get_pose()
-        jacobian = self.kinematic_model.compute_end_link_spatial_jacobian(robot_qpos_vec[:self.arm_dof]).flatten()
+        jacobian = self.kinematic_model.compute_end_link_spatial_jacobian(
+            robot_qpos_vec[:self.arm_dof]).flatten()
         return np.concatenate([jacobian, robot_qpos_vec, ee_pose.p, ee_pose.q])
 
     def get_reward(self, action):
@@ -123,10 +128,12 @@ class DClawRLEnv(DClawEnv, BaseRLEnv):
             self.robot.set_qpos(qpos)
             self.robot.set_drive_target(qpos)
             init_pos = np.array(lab.ROBOT2BASE.p) + self.robot_info.root_offset
-            init_pose = sapien.Pose(init_pos, transforms3d.euler.euler2quat(0, 0, 0))
+            init_pose = sapien.Pose(
+                init_pos, transforms3d.euler.euler2quat(0, 0, 0))
             # init_pose = sapien.Pose(np.array([-0.55, 0, 0.17145]), transforms3d.euler.euler2quat(0, 0, 0))
         else:
-            init_pose = sapien.Pose(np.array([-0.3, 0, 0.2]), transforms3d.euler.euler2quat(0, np.pi / 2, 0))
+            init_pose = sapien.Pose(
+                np.array([-0.3, 0, 0.2]), transforms3d.euler.euler2quat(0, np.pi / 2, 0))
 
         self.robot.set_pose(init_pose)
         self.reset_internal()
@@ -155,8 +162,10 @@ class DClawRLEnv(DClawEnv, BaseRLEnv):
         for link in self.manipulated_object.get_links():
             if "up" in link.get_name():
                 rotate_object_qpos = link.get_pose().q
-                x,y,z = transforms3d.euler.quat2euler(rotate_object_qpos)
-                if z < 0:
+                x, y, z = transforms3d.euler.quat2euler(rotate_object_qpos)
+                if z > np.pi:
+                    z = 2 * np.pi - z
+                elif z < 0:
                     z = 2 * np.pi + z
                 z_angle = z/np.pi*180
         return z_angle
@@ -164,17 +173,20 @@ class DClawRLEnv(DClawEnv, BaseRLEnv):
     def _is_object_rotated(self):
         # check the x-y position of the object against the target
         delta_angle = self.get_object_rotate_angle() - self.object_angle
-        if delta_angle < -300:
+        if delta_angle < -320:
             self.rounds += 1
             delta_angle = 360 + delta_angle
+        elif delta_angle > 320:
+            self.rounds -= 1
+            delta_angle = -360 + delta_angle
         self.object_angle = self.get_object_rotate_angle()
         self.object_total_rotate_angle += delta_angle
 
         return delta_angle != 0
-    
+
     def _is_success(self):
 
-        return self.object_total_rotate_angle > 720
+        return self.object_total_rotate_angle >= 630
 
     def get_info(self):
         return {"is_object_rotated": self._is_object_rotated(),

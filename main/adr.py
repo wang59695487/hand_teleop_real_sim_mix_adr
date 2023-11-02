@@ -38,8 +38,8 @@ def aug_in_adr(args, current_rank, demo_files):
             total_episodes = 0
             init_obj_poses = []
             var_adr_light = 1
-            var_adr_target = 0.025
-            var_adr_object = 0.025
+            var_adr_target = 0.06
+            var_adr_object = 0.06
             is_var_adr = True
             is_stop = False
             meta_data_path = f"{args['sim_dataset_folder']}/meta_data.pickle"
@@ -85,7 +85,7 @@ def aug_in_adr(args, current_rank, demo_files):
 
                 elif args["task_name"] == "dclaw":
                     var_obj = var_adr_object if current_rank >= 3 else 0
-                    x1 = np.random.uniform(-var_obj / 2, var_obj / 2)
+                    x1 = np.random.uniform(-var_obj / 2, var_obj / 4)
                     y1 = np.random.uniform(-var_obj, var_obj)
                     init_pose_aug_obj = sapien.Pose([x1, y1, 0], [1, 0, 0, 0])
                     init_pose_aug_target = None
@@ -176,8 +176,8 @@ def adr(args, current_rank, adr_dict):
                 if adr_dict["is_var_adr"]
                 else adr_dict["var_adr_target"]
             )
-            if adr_dict["var_adr_target"] > 0.15:
-                adr_dict["var_adr_target"] = 0.15
+            if adr_dict["var_adr_target"] > 0.16:
+                adr_dict["var_adr_target"] = 0.16
                 current_rank += 1
 
         elif current_rank == 4 and args["task_name"] in ["pick_place", "pour"]:
@@ -186,28 +186,28 @@ def adr(args, current_rank, adr_dict):
                 if adr_dict["is_var_adr"]
                 else adr_dict["var_adr_object"]
             )
-            if adr_dict["var_adr_object"] > 0.15:
-                adr_dict["var_adr_object"] = 0.15
+            if adr_dict["var_adr_object"] > 0.16:
+                adr_dict["var_adr_object"] = 0.16
                 current_rank += 1
 
         elif current_rank == 3 and args["task_name"] == "dclaw":
             adr_dict["var_adr_object"] = (
-                adr_dict["var_adr_object"] + 0.02
+                adr_dict["var_adr_object"] + 0.03
                 if adr_dict["is_var_adr"]
                 else adr_dict["var_adr_object"]
             )
-            if adr_dict["var_adr_object"] > 0.1:
-                adr_dict["var_adr_object"] = 0.1
+            if adr_dict["var_adr_object"] > 0.18:
+                adr_dict["var_adr_object"] = 0.18
                 current_rank += 1
 
         elif current_rank == 4 and args["task_name"] == "dclaw":
             adr_dict["var_adr_object"] = (
-                adr_dict["var_adr_object"] + 0.02
+                adr_dict["var_adr_object"] + 0.03
                 if adr_dict["is_var_adr"]
                 else adr_dict["var_adr_object"]
             )
-            if adr_dict["var_adr_object"] > 0.2:
-                adr_dict["var_adr_object"] = 0.2
+            if adr_dict["var_adr_object"] > 0.3:
+                adr_dict["var_adr_object"] = 0.3
                 current_rank += 1
 
         ################## Finish ADR##################
