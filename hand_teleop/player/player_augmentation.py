@@ -83,6 +83,13 @@ def create_env(args, demo, retarget=False):
     if 'init_target_pos' in meta_data["env_kwargs"].keys():
         env_params['init_target_pos'] = meta_data["env_kwargs"]['init_target_pos']
     if task_name == 'pick_place':
+        bottle_id = np.random.randint(0, 10)
+        if bottle_id == 9:
+            env_params["object_category"] = "YCB"
+            env_params["object_name"] = "mustard_bottle"
+        else:
+            env_params["object_category"] = "SHAPE_NET"
+            env_params["object_name"] = "bottle_{}".format(bottle_id)
         env = PickPlaceRLEnv(**env_params)
     elif task_name == 'dclaw':
         env = DClawRLEnv(**env_params)
@@ -288,6 +295,7 @@ def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_target, in
             rgb_pics.append(rgb_pic)
 
     ee_pose = baked_data["ee_pose"][start_idx]
+    sim_ee_delta_pose_bound = 0.001 if task_name != "dclaw" else 0.0005
     for idx in tqdm(range(start_idx+1, len(baked_data["obs"]), frame_skip)):
         # NOTE: robot.get_qpos() version
         if idx < len(baked_data['obs'])-frame_skip:
@@ -297,7 +305,7 @@ def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_target, in
             hand_qpos = baked_data["action"][idx][env.arm_dof:]
             delta_hand_qpos = hand_qpos - hand_qpos_prev if idx != 0 else hand_qpos
 
-            if ee_pose_delta < 0.001 and np.mean(handqpos2angle(delta_hand_qpos)) <= 1.2 and task_name in ['dclaw']:
+            if ee_pose_delta < sim_ee_delta_pose_bound and np.mean(handqpos2angle(delta_hand_qpos)) <= 1.2:
                 continue
 
             else:

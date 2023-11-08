@@ -446,7 +446,6 @@ def play_one_real_sim_visual_demo(
                 if (
                     ee_pose_delta <= args["sim_delta_ee_pose_bound"]
                     and np.mean(handqpos2angle(delta_hand_qpos)) <= 1.2
-                    and task_name in ["dclaw"]
                 ):
                     continue
                 else:
