@@ -242,8 +242,8 @@ def eval_in_env(
     object_p = np.array([x, y, sampled_pos.p[-1]])
     object_pos = (
         sapien.Pose(p=object_p, q=sampled_pos.q)
-        if task_name in ["pick_place", "pour"]
-        else sapien.Pose(p=object_p, q=[0.707, 0, 0, 0.707])
+        # if task_name in ["pick_place", "pour"]
+        # else sapien.Pose(p=object_p, q=[0.707, 0, 0, 0.707])
     )
     print("Object Pos: {}".format(object_pos))
 
@@ -294,12 +294,13 @@ def eval_in_env(
                 env.target_object.set_pose(
                     sapien.Pose([0, 0.2, env.bowl_height], [1, 0, 0, 0])
                 )
+        
+        for _ in range(10 * env.frame_skip):
+            env.scene.step()
+    
     elif task_name == "dclaw":
         env.object_total_rotate_angle = 0
         env.object_angle = env.get_object_rotate_angle()
-
-    for _ in range(10 * env.frame_skip):
-        env.scene.step()
 
     obs = env.get_observation()
     success = False
