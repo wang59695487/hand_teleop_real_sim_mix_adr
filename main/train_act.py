@@ -189,8 +189,8 @@ def main(args):
 
                 else:
 
-                    loss_train_dict= train_in_one_epoch(agent, Prepared_Data['it_per_epoch'], Prepared_Data['bc_train_dataloader'],
-                                                                                Prepared_Data['bc_validation_dataloader'], L, epoch)
+                    loss_train_dict = train_in_one_epoch(agent, Prepared_Data['it_per_epoch'], Prepared_Data['bc_train_dataloader'],
+                                                         Prepared_Data['bc_validation_dataloader'], L, epoch)
                     metrics = {
                         "loss/train": loss_train_dict["train"],
                         "loss/train_l1": loss_train_dict["train_l1"],
@@ -255,28 +255,32 @@ def main(args):
             "logs", f"{args['ckpt'].split('/')[-2]}_Finetuning_{args['backbone_type']}_{cur_time}")
 
         wandb.init(
-            project="hand-teleop-adr-rank",
+            project="hand-teleop",
             name=os.path.basename(log_dir),
             config=args
         )
 
         os.makedirs(log_dir, exist_ok=True)
-
+        min_loss = 1
         for epoch in range(args['num_epochs']):
             print('  ', 'Epoch: ', epoch)
             agent.policy.train()
 
             loss_train_dict = train_in_one_epoch(agent, Prepared_Data['it_per_epoch'], Prepared_Data['bc_train_dataloader'],
-                                                                        Prepared_Data['bc_validation_dataloader'], L, epoch)
+                                                 Prepared_Data['bc_validation_dataloader'], L, epoch)
             metrics = {
-                        "loss/train": loss_train_dict["train"],
-                        "loss/train_l1": loss_train_dict["train_l1"],
-                        "loss/train_kl": loss_train_dict["train_kl"]*args['kl_weight'],
-                        "loss/val": loss_train_dict["val"],
-                        "epoch": epoch
+                "loss/train": loss_train_dict["train"],
+                "loss/train_l1": loss_train_dict["train_l1"],
+                "loss/train_kl": loss_train_dict["train_kl"]*args['kl_weight'],
+                "loss/val": loss_train_dict["val"],
+                "epoch": epoch
             }
 
             wandb.log(metrics)
+            if min_loss >= loss_train_dict["val"]:
+                min_loss = loss_train_dict["val"]
+                agent.save(os.path.join(
+                    log_dir, f"epoch_best.pt"), args)
             if (epoch + 1) % args["eval_freq"] == 0 and (epoch+1) >= args["eval_start_epoch"]:
                 agent.save(os.path.join(
                     log_dir, f"epoch_{epoch + 1}.pt"), args)
@@ -307,6 +311,7 @@ def parse_args():
     parser.add_argument("--randomness-rank", default=1, type=int)
     parser.add_argument("--dann", action="store_true")
     parser.add_argument("--domain_weight", default=20, type=float)
+    parser.add_argument("--is-feature", default=False, type=bool)
 
     args = parser.parse_args()
 
@@ -341,6 +346,7 @@ if __name__ == '__main__':
         "finetune": args.finetune,
         "dann": args.dann,
         'domain_weight': args.domain_weight,
+        "is_feature": args.is_feature,
         "randomness_rank": args.randomness_rank,
         "ckpt": args.ckpt,
         "seed": 20230915

@@ -76,6 +76,7 @@ def get_args_parser():
     parser.add_argument("--finetune", action="store_true")
     parser.add_argument("--task-name", default="pick_place", type=str)
     parser.add_argument("--dann", action="store_true")
+    parser.add_argument("--is-feature", default=False, type=bool)
     parser.add_argument("--domain_weight", default=20, type=float)
 
     return parser
@@ -131,12 +132,13 @@ class ACTPolicy(nn.Module):
         self.kl_weight = args_override['kl_weight']
         self.domain_weight = args_override['domain_weight']
         self.dann = args_override['dann']
+        self.is_feature = args_override['is_feature']
         print(f'KL Weight {self.kl_weight}')
 
     def __call__(self, obs, qpos, actions=None, is_pad=None, sim_real_label=None):
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                          std=[0.229, 0.224, 0.225])
-        obs = normalize(obs)
+        obs = normalize(obs) if not self.is_feature else obs
 
         if actions is not None:  # training time
             actions = actions[:, :self.model.num_queries]
@@ -191,7 +193,8 @@ class ActAgent(object):
                          'dec_layers': dec_layers,
                          'nheads': nheads,
                          'dann': args['dann'],
-                         'domain_weight': args['domain_weight']
+                         'domain_weight': args['domain_weight'],
+                         'is_feature': args['is_feature'],
                          }
 
         set_seed(args['seed'])
