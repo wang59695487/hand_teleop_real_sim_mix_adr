@@ -340,6 +340,9 @@ def play_one_real_sim_visual_demo(
         ee_pose = baked_data["ee_pose"][0]
         hand_qpos_prev = baked_data["action"][0][env.arm_dof:]
 
+    valid_frame = 0
+    lifted_chunk = 0
+    stop_frame = 0
     if using_real_data:
         for idx in tqdm(range(len(baked_data))):
             # NOTE: robot.get_qpos() version
@@ -357,6 +360,7 @@ def play_one_real_sim_visual_demo(
                 ):
                     continue
                 else:
+                    valid_frame += 1
                     ee_pose = ee_pose_next
                     hand_qpos_prev = hand_qpos
 
@@ -427,13 +431,12 @@ def play_one_real_sim_visual_demo(
 
                     target_qpos = np.concatenate([arm_qpos, hand_qpos])
                     env.robot.set_qpos(target_qpos)
+                    if valid_frame >= 1500 and args['task_name'] == "dclaw":
+                        break
 
         return visual_baked, meta_data
 
     else:
-        valid_frame = 0
-        lifted_chunk = 0
-        stop_frame = 0
         for idx in tqdm(range(0, len(baked_data["obs"]), frame_skip)):
             # NOTE: robot.get_qpos() version
             if idx != len(baked_data["obs"]) - frame_skip:
@@ -659,34 +662,6 @@ def stack_and_save_frames(
         )
         # visual_training_set = {"obs": obs_chunk, "action": action_chunk, "robot_qpos": robot_qpos_chunk, "sim_real_label": sim_real_label_chunk}
         g1 = file1.create_group("episode_{}".format(episode + total_episode))
-        g1.create_dataset("obs", data=obs_chunk)
-        g1.create_dataset("action", data=action_chunk)
-        g1.create_dataset("robot_qpos", data=robot_qpos_chunk)
-        g1.create_dataset("sim_real_label", data=sim_real_label_chunk)
-
-    if len(obs) % args["chunk_size"] != 0 and using_real_data:
-        obs_chunk = obs[(episode + 1) * args["chunk_size"]:]
-        obs_chunk = obs_chunk + [
-            obs_chunk[-1] for _ in range(args["chunk_size"] - len(obs_chunk))
-        ]
-        action_chunk = action[(episode + 1) * args["chunk_size"]:]
-        action_chunk = action_chunk + [
-            action_chunk[-1] for _ in range(args["chunk_size"] - len(action_chunk))
-        ]
-        robot_qpos_chunk = robot_qpos[(episode + 1) * args["chunk_size"]:]
-        robot_qpos_chunk = robot_qpos_chunk + [
-            robot_qpos_chunk[-1]
-            for _ in range(args["chunk_size"] - len(robot_qpos_chunk))
-        ]
-        sim_real_label_chunk = (
-            np.array([1 for _ in range(len(obs_chunk))])
-            if using_real_data
-            else torch.tensor([0 for _ in range(len(obs_chunk))])
-        )
-        episode = episode + 1
-        if f"episode_{episode+total_episode}" in file1.keys():
-            del file1[f"episode_{episode+total_episode}"]
-        g1 = file1.create_group(f"episode_{episode+total_episode}")
         g1.create_dataset("obs", data=obs_chunk)
         g1.create_dataset("action", data=action_chunk)
         g1.create_dataset("robot_qpos", data=robot_qpos_chunk)
