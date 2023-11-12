@@ -304,6 +304,7 @@ def parse_args():
     parser.add_argument("--object-name", default="mustard_bottle", type=str)
     parser.add_argument("--dann", action="store_true")
     parser.add_argument("--domain_weight", default=20, type=float)
+    parser.add_argument("--is-feature", default=False, type=bool)
 
     args = parser.parse_args()
 
@@ -343,6 +344,7 @@ if __name__ == "__main__":
         "ckpt": args.ckpt,
         "task_name": args.task_name,
         "object_name": args.object_name,
+        "is_feature": args.is_feature,
         "seed": 20230930,
     }
     args = argument_dependecy_checker(args)
