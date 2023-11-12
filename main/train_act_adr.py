@@ -301,6 +301,7 @@ def parse_args():
     parser.add_argument("--val-ratio", default=0.1, type=float)
     parser.add_argument("--randomness-rank", default=2, type=int)
     parser.add_argument("--task-name", default="pick_place", type=str)
+    parser.add_argument("--object-name", default="mustard_bottle", type=str)
     parser.add_argument("--dann", action="store_true")
     parser.add_argument("--domain_weight", default=20, type=float)
 
@@ -341,6 +342,7 @@ if __name__ == "__main__":
         "randomness_rank": args.randomness_rank,
         "ckpt": args.ckpt,
         "task_name": args.task_name,
+        "object_name": args.object_name,
         "seed": 20230930,
     }
     args = argument_dependecy_checker(args)

@@ -186,7 +186,7 @@ class DClawRLEnv(DClawEnv, BaseRLEnv):
 
     def _is_success(self):
 
-        return self.object_total_rotate_angle >= 630
+        return self.object_total_rotate_angle >= 720
 
     def get_info(self):
         return {"is_object_rotated": self._is_object_rotated(),

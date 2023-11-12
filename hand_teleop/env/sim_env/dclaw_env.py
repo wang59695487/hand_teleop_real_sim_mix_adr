@@ -14,7 +14,8 @@ class DClawEnv(BaseSimulationEnv):
                  object_scale=1.0, randomness_scale=1, friction=1, use_visual_obs=False,
                  init_obj_pos: Optional[sapien.Pose] = None, init_target_pos: Optional[sapien.Pose] = None,
                  **renderer_kwargs):
-        super().__init__(use_gui=use_gui, frame_skip=frame_skip, use_visual_obs=use_visual_obs, **renderer_kwargs)
+        super().__init__(use_gui=use_gui, frame_skip=frame_skip,
+                         use_visual_obs=use_visual_obs, **renderer_kwargs)
 
         # Object info
         self.object_name = object_name
@@ -41,7 +42,8 @@ class DClawEnv(BaseSimulationEnv):
 
         # Dummy camera creation to initial geometry object
         if self.renderer and not self.no_rgb:
-            cam = self.scene.add_camera("init_not_used", width=10, height=10, fovy=1, near=0.1, far=1)
+            cam = self.scene.add_camera(
+                "init_not_used", width=10, height=10, fovy=1, near=0.1, far=1)
             self.scene.remove_camera(cam)
 
         # Load table
@@ -49,8 +51,22 @@ class DClawEnv(BaseSimulationEnv):
         self.tables = self.create_lab_tables(table_height=0.91)
 
         asset_path = Path(__file__).parent.parent.parent.parent / "assets"
-        if "3x" in self.object_name:
+        if self.object_name == "dclaw_3x":
             urdf_path = asset_path / "robel" / "dclaw_3x.urdf"
+        elif self.object_name == "dclaw_3x_135":
+            urdf_path = asset_path / "robel_auto" / "valve_3-cross_135" / "dclaw_valve.urdf"
+        elif self.object_name == "dclaw_4x_60":
+            urdf_path = asset_path / "robel_auto" / "valve_4-cross_60" / "dclaw_valve.urdf"
+        elif self.object_name == "dclaw_4x_75":
+            urdf_path = asset_path / "robel_auto" / "valve_4-cross_75" / "dclaw_valve.urdf"
+        elif self.object_name == "dclaw_4x_90":
+            urdf_path = asset_path / "robel_auto" / "valve_4-cross_90" / "dclaw_valve.urdf"
+        elif self.object_name == "dclaw_5x_60":
+            urdf_path = asset_path / "robel_auto" / "valve_5-cross_60" / "dclaw_valve.urdf"
+        elif self.object_name == "dclaw_5x_72":
+            urdf_path = asset_path / "robel_auto" / "valve_5-cross_72" / "dclaw_valve.urdf"
+        elif self.object_name == "dclaw_5x_75":
+            urdf_path = asset_path / "robel_auto" / "valve_5-cross_75" / "dclaw_valve.urdf"
         else:
             raise NotImplementedError
 
@@ -60,7 +76,7 @@ class DClawEnv(BaseSimulationEnv):
         builder = loader.load_file_as_articulation_builder(str(urdf_path))
         self.manipulated_object = builder.build(fix_root_link=True)
         rotating_joint = self.manipulated_object.get_active_joints()[0]
-        rotating_joint.set_drive_property(0, 0.1)        
+        rotating_joint.set_drive_property(0, 0.1)
         self.generate_random_object_texture(2)
 
     def generate_random_object_pose(self, randomness_scale):
@@ -69,9 +85,9 @@ class DClawEnv(BaseSimulationEnv):
         pos_y = random.uniform(-0.05, 0.05) * randomness_scale
         position = np.array([pos_x, pos_y, 0.0])
         position = np.array([0, 0, 0.0])
-        random_pose = sapien.Pose(position, [0.707, 0, 0, 0.707] )
+        random_pose = sapien.Pose(position, [0.707, 0, 0, 0.707])
         return random_pose
-    
+
     def generate_random_object_texture(self, randomness_scale):
         var = 0.1 * randomness_scale
         for link in self.manipulated_object.get_links():
@@ -90,7 +106,7 @@ class DClawEnv(BaseSimulationEnv):
                     mat.set_roughness(random.uniform(0.7-var, 0.7+var))
                     mat.set_metallic(random.uniform(0, var))
                     geom.set_material(mat)
-                    
+
         for table in self.tables:
             for visual in table.get_visual_bodies():
                 for geom in visual.get_render_shapes():
@@ -109,10 +125,13 @@ class DClawEnv(BaseSimulationEnv):
         table_thickness = 0.03
 
         # Top
-        top_pose = sapien.Pose(np.array([lab.TABLE_ORIGIN[0], lab.TABLE_ORIGIN[1], -table_thickness / 2]))
+        top_pose = sapien.Pose(
+            np.array([lab.TABLE_ORIGIN[0], lab.TABLE_ORIGIN[1], -table_thickness / 2]))
         top_material = self.scene.create_physical_material(1, 0.5, 0.01)
-        table_half_size = np.concatenate([lab.TABLE_XY_SIZE / 2, [table_thickness / 2]])
-        builder.add_box_collision(pose=top_pose, half_size=table_half_size, material=top_material)
+        table_half_size = np.concatenate(
+            [lab.TABLE_XY_SIZE / 2, [table_thickness / 2]])
+        builder.add_box_collision(
+            pose=top_pose, half_size=table_half_size, material=top_material)
         # Leg
         if self.renderer and not self.no_rgb:
             table_visual_material = self.renderer.create_material()
@@ -121,12 +140,14 @@ class DClawEnv(BaseSimulationEnv):
             table_visual_material.set_base_color(np.array([0.9, 0.9, 0.9, 1]))
             table_visual_material.set_roughness(0.3)
 
-            leg_size = np.array([0.025, 0.025, (table_height / 2 - table_half_size[2])])
+            leg_size = np.array(
+                [0.025, 0.025, (table_height / 2 - table_half_size[2])])
             leg_height = -table_height / 2 - table_half_size[2]
             x = table_half_size[0] - 0.1
             y = table_half_size[1] - 0.1
 
-            builder.add_box_visual(pose=top_pose, half_size=table_half_size, material=table_visual_material)
+            builder.add_box_visual(
+                pose=top_pose, half_size=table_half_size, material=table_visual_material)
             builder.add_box_visual(pose=sapien.Pose([x, y + lab.TABLE_ORIGIN[1], leg_height]), half_size=leg_size,
                                    material=table_visual_material, name="leg0")
             builder.add_box_visual(pose=sapien.Pose([x, -y + lab.TABLE_ORIGIN[1], leg_height]), half_size=leg_size,
@@ -139,7 +160,8 @@ class DClawEnv(BaseSimulationEnv):
 
         # Build robot table
         robot_table_thickness = 0.025
-        table_half_size = np.concatenate([lab.ROBOT_TABLE_XY_SIZE / 2, [robot_table_thickness / 2]])
+        table_half_size = np.concatenate(
+            [lab.ROBOT_TABLE_XY_SIZE / 2, [robot_table_thickness / 2]])
         robot_table_offset = -lab.DESK2ROBOT_Z_AXIS
         table_height += robot_table_offset
         builder = self.scene.create_actor_builder()
@@ -148,14 +170,17 @@ class DClawEnv(BaseSimulationEnv):
                       lab.ROBOT2BASE.p[1] - table_half_size[1] + 0.08,
                       -robot_table_thickness / 2 + robot_table_offset]))
         top_material = self.scene.create_physical_material(1, 0.5, 0.01)
-        builder.add_box_collision(pose=top_pose, half_size=table_half_size, material=top_material)
+        builder.add_box_collision(
+            pose=top_pose, half_size=table_half_size, material=top_material)
         if self.renderer and not self.no_rgb:
             table_visual_material = self.renderer.create_material()
             table_visual_material.set_metallic(0.0)
             table_visual_material.set_specular(0.2)
-            table_visual_material.set_base_color(np.array([0, 0, 0, 255]) / 255)
+            table_visual_material.set_base_color(
+                np.array([0, 0, 0, 255]) / 255)
             table_visual_material.set_roughness(0.1)
-            builder.add_box_visual(pose=top_pose, half_size=table_half_size, material=table_visual_material)
+            builder.add_box_visual(
+                pose=top_pose, half_size=table_half_size, material=table_visual_material)
         robot_table = builder.build_static("robot_table")
         return object_table, robot_table
 
@@ -164,7 +189,8 @@ def env_test():
     from sapien.utils import Viewer
     from constructor import add_default_scene_light
     randomness_scale = 1
-    env = DClawEnv(object_name="dclaw_3x", randomness_scale=randomness_scale, object_scale=0.8)
+    env = DClawEnv(object_name="dclaw_3x",
+                   randomness_scale=randomness_scale, object_scale=0.8)
     viewer = Viewer(env.renderer)
     viewer.set_scene(env.scene)
     add_default_scene_light(env.scene, env.renderer)

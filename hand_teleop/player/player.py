@@ -23,6 +23,17 @@ from hand_teleop.kinematics.retargeting_optimizer import PositionRetargeting
 from hand_teleop.real_world import lab
 from hand_teleop.player.data_players import *
 
+dclaw_diverse_objects = {
+    0: "dclaw_3x",
+    1: "dclaw_3x_135",
+    2: "dclaw_4x_60",
+    3: "dclaw_4x_75",
+    4: "dclaw_4x_90",
+    5: "dclaw_5x_60",
+    6: "dclaw_5x_72",
+    7: "dclaw_5x_75"
+}
+
 
 def handqpos2angle(hand_qpos):
     delta_angles = []
@@ -35,14 +46,13 @@ def handqpos2angle(hand_qpos):
     return delta_angles
 
 
-def create_env_test(retarget=False, idx=50):
+def create_env_test(retarget=False, idx=1):
     # Recorder
     # shutil.rmtree('./temp/demos/player', ignore_errors=True)
     # os.makedirs('./temp/demos/player')
-    path = f"./sim/raw_data/pick_place_mustard_bottle/mustard_bottle_{idx:004d}.pickle"
-    # path = f"./sim/raw_data/dclaw/dclaw_3x_{idx:004d}.pickle"
-    # path = f"sim/raw_data/pick_place_sugar_box/sugar_box_{idx:004d}.pickle"
-    # path = f"sim/raw_data/pour/chip_can_{idx:004d}.pickle"
+    # path = f"./sim/raw_data/pick_place_mustard_bottle/mustard_bottle_{idx:004d}.pickle"
+    path = f"./sim/raw_data/dclaw/dclaw_3x_{idx:004d}.pickle"
+    # path = f"./sim/raw_data/pick_place/bottle_1_{idx:004d}.pickle"
     all_data = np.load(path, allow_pickle=True)
     meta_data = all_data["meta_data"]
     task_name = meta_data["env_kwargs"]["task_name"]
@@ -69,11 +79,19 @@ def create_env_test(retarget=False, idx=50):
     env_params = meta_data["env_kwargs"]
     env_params["robot_name"] = robot_name
     env_params["use_visual_obs"] = use_visual_obs
-    env_params["use_gui"] = True
+    env_params["use_gui"] = False
     # env_params["object_name"] = "sugar_box"
     # env_params["object_name"] = "bleach_cleanser"
     # env_params["object_category"] = "SHAPE_NET"
-    # env_params["object_name"] = "bottle_1"
+    # env_params["object_name"] = "bottle_8"
+
+    # env_params["object_name"] = "dclaw_3x_135"
+    # env_params["object_name"] = "dclaw_4x_60"
+    # env_params["object_name"] = "dclaw_4x_75"
+    # env_params["object_name"] = "dclaw_4x_90"
+    # env_params["object_name"] = "dclaw_5x_60"
+    # env_params["object_name"] = "dclaw_5x_72"
+    env_params["object_name"] = "dclaw_5x_75"
 
     if "CUDA_VISIBLE_DEVICES" in os.environ:
         env_params["device"] = "cuda"
@@ -129,14 +147,14 @@ def create_env_test(retarget=False, idx=50):
             env.rl_step = env.simple_sim_step
 
     env.reset()
-    viewer = env.render()
-    env.viewer = viewer
-    viewer.set_camera_xyz(-0.6, 0.6, 0.6)
-    viewer.set_camera_rpy(0, -np.pi / 6, np.pi / 4)
+    # viewer = env.render()
+    # env.viewer = viewer
+    # viewer.set_camera_xyz(-0.6, 0.6, 0.6)
+    # viewer.set_camera_rpy(0, -np.pi / 6, np.pi / 4)
 
     real_camera_cfg = {
         "relocate_view": dict(
-            pose=lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(640, 480)
+            pose=lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(224, 224)
         )
     }
 
@@ -204,12 +222,12 @@ def create_env_test(retarget=False, idx=50):
     if baked_data["robot_qvel"] != []:
         env.robot.set_qvel(baked_data["robot_qvel"][0])
 
-    return env, task_name, meta_data, baked_data
+    return env, task_name, meta_data, baked_data, path, idx
 
 
-def bake_visual_demonstration_test(retarget=False):
-    env, task_name, meta_data, baked_data = create_env_test(
-        retarget=retarget)
+def bake_visual_demonstration_test(retarget=False, idx=1):
+    env, task_name, meta_data, baked_data, path, demo_idx = create_env_test(
+        retarget=retarget, idx=idx)
 
     robot_pose = env.robot.get_pose()
     ee_pose = baked_data["ee_pose"][0]
@@ -358,139 +376,26 @@ def bake_visual_demonstration_test(retarget=False):
                     np.concatenate([delta_pose * 100, hand_qpos])
                 )
                 _, _, _, info = env.step(target_qpos)
-                env.render()
-                print(valid_frame)
-                print(info["success"])
+                # env.render()
+                # print(valid_frame)
+                # print(info["object_total_rotate_angle"])
                 rgb = env.get_observation(
                 )["relocate_view-rgb"].cpu().detach().numpy()
                 rgb_pic = (rgb * 255).astype(np.uint8)
                 rgb_pics.append(rgb_pic)
-    # object_name = meta_data["env_kwargs"]["object_name"]
-    # imageio.mimsave(
-    #     f"./temp/demos/player/pick_place-rgb_{object_name}.mp4",
-    #     rgb_pics,
-    #     fps=180,
-    # )
+    object_name = meta_data["env_kwargs"]["object_name"]
+    all_data = np.load(path, allow_pickle=True)
+    all_data["meta_data"] = meta_data
+    all_data["meta_data"]["env_kwargs"]["task_name"] = task_name
 
-    # # assign weights for action chunk
-    # total_frame = len(visual_baked["obs"])
-    # chunk_sensitivity = []
-    # for i in range(total_frame // 50):
-    #     for var in [1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0]:
-    #         valid_frame = 0
-    #         visual_baked = dict(obs=[], action=[])
-    #         rgb_pics = []
-    #         env.reset()
-    #         for idx in range(0, len(baked_data["obs"]), frame_skip):
-    #             # NOTE: robot.get_qpos() version
-    #             if idx < len(baked_data["obs"]) - frame_skip:
-    #                 ee_pose_next = baked_data["ee_pose"][idx + frame_skip]
-    #                 ee_pose_delta = np.sqrt(
-    #                     np.sum((ee_pose_next[:3] - ee_pose[:3]) ** 2)
-    #                 )
-    #                 hand_qpos = baked_data["action"][idx][env.arm_dof :]
-    #                 delta_hand_qpos = (
-    #                     hand_qpos - hand_qpos_prev if idx != 0 else hand_qpos
-    #                 )
-
-    #                 if (
-    #                     ee_pose_delta < 0.001
-    #                     and np.mean(handqpos2angle(delta_hand_qpos)) <= 1.2
-    #                 ):
-    #                     continue
-    #                 else:
-    #                     valid_frame += 1
-    #                     ee_pose = ee_pose_next
-    #                     hand_qpos_prev = hand_qpos
-
-    #                     palm_pose = env.ee_link.get_pose()
-    #                     palm_pose = robot_pose.inv() * palm_pose
-
-    #                     if task_name in ["pick_place", "pour"]:
-    #                         if env._is_object_lifted():
-    #                             if aug_step_target > 0:
-    #                                 aug_step_target -= 1
-    #                                 aug_target = aug_target + one_step_aug_target
-    #                             palm_next_pose = sapien.Pose(
-    #                                 [aug_target[0], aug_target[1], 0], [1, 0, 0, 0]
-    #                             ) * sapien.Pose(ee_pose_next[0:3], ee_pose_next[3:7])
-
-    #                         elif not env._is_object_lifted():
-    #                             if aug_step_obj > 0:
-    #                                 aug_step_obj -= 1
-    #                                 aug_obj = aug_obj + one_step_aug_obj
-    #                             palm_next_pose = sapien.Pose(
-    #                                 [aug_obj[0], aug_obj[1], 0], [1, 0, 0, 0]
-    #                             ) * sapien.Pose(ee_pose_next[0:3], ee_pose_next[3:7])
-
-    #                     if task_name == "dclaw":
-    #                         if aug_step_obj > 0:
-    #                             aug_step_obj -= 1
-    #                             aug_obj = aug_obj + one_step_aug_obj
-    #                         palm_next_pose = sapien.Pose(
-    #                             [aug_obj[0], aug_obj[1], 0], [1, 0, 0, 0]
-    #                         ) * sapien.Pose(ee_pose_next[0:3], ee_pose_next[3:7])
-
-    #                     palm_next_pose = robot_pose.inv() * palm_next_pose
-    #                     palm_delta_pose = palm_pose.inv() * palm_next_pose
-    #                     delta_axis, delta_angle = transforms3d.quaternions.quat2axangle(
-    #                         palm_delta_pose.q
-    #                     )
-    #                     if delta_angle > np.pi:
-    #                         delta_angle = 2 * np.pi - delta_angle
-    #                         delta_axis = -delta_axis
-    #                     delta_axis_world = (
-    #                         palm_pose.to_transformation_matrix()[:3, :3] @ delta_axis
-    #                     )
-    #                     delta_pose = np.concatenate(
-    #                         [
-    #                             palm_next_pose.p - palm_pose.p,
-    #                             delta_axis_world * delta_angle,
-    #                         ]
-    #                     )
-    #                     ##############################Action Chunk Test#################################
-    #                     if valid_frame > i * 50 and valid_frame <= (i + 1) * 50:
-    #                         delta_pose = delta_pose * var
-    #                         delta_hand_qpos = delta_hand_qpos * var
-    #                         hand_qpos = hand_qpos_prev + delta_hand_qpos
-    #                         rgb = (
-    #                             env.get_observation()["relocate_view-rgb"]
-    #                             .cpu()
-    #                             .detach()
-    #                             .numpy()
-    #                         )
-    #                         rgb_pic = (rgb * 255).astype(np.uint8)
-    #                         rgb_pics.append(rgb_pic)
-
-    #                     palm_jacobian = (
-    #                         env.kinematic_model.compute_end_link_spatial_jacobian(
-    #                             env.robot.get_qpos()[: env.arm_dof]
-    #                         )
-    #                     )
-    #                     arm_qvel = compute_inverse_kinematics(
-    #                         delta_pose, palm_jacobian
-    #                     )[: env.arm_dof]
-    #                     arm_qpos = arm_qvel + env.robot.get_qpos()[: env.arm_dof]
-
-    #                     target_qpos = np.concatenate([arm_qpos, hand_qpos])
-    #                     visual_baked["obs"].append(env.get_observation())
-    #                     visual_baked["action"].append(
-    #                         np.concatenate([delta_pose * 100, hand_qpos])
-    #                     )
-    #                     _, _, _, info = env.step(target_qpos)
-
-    #                     info_success = info["success"]
-    #                     # env.render()
-
-    #         if not info_success:
-    #             imageio.mimsave(
-    #                 f"./temp/demos/player/relocate-rgb_domo{demo_idx}_chunk{i}_var{var}_{info_success}.mp4",
-    #                 rgb_pics,
-    #                 fps=120,
-    #             )
-    #             break
-    # print("total_frames", len(visual_baked['obs']))
-    # print("total_grasp_frames", len(rgb_pics))
+    if info["success"]:
+        with open(f"./sim/raw_data/dclaw_diverse/{object_name}_{demo_idx:04d}.pickle", "wb") as f:
+            pickle.dump(all_data, f)
+        imageio.mimsave(
+            f"./temp/demos/player/dclaw_{object_name}_{demo_idx:04d}.mp4",
+            rgb_pics,
+            fps=180,
+        )
 
 
 def bake_visual_real_demonstration_test(retarget=False):
@@ -687,7 +592,7 @@ def bake_visual_real_demonstration_test(retarget=False):
             retargeting, method="tip_middle", indices=indices
         )
     elif using_real:
-        path = "./real/raw_data/pick_place_mustard_bottle_large_scale/0001.pkl"
+        path = "./real/raw_data/pick_place/0001.pkl"
         # path = "./real/raw_data/pick_place_tomato_soup_can/0000.pkl"
         # path = "./real/raw_data/pick_place_sugar_box/0000.pkl"
         # path = "./real/raw_data/dclaw_small_scale/0001.pkl"
@@ -759,7 +664,7 @@ def bake_visual_real_demonstration_test(retarget=False):
             # dist_object_hand = np.linalg.norm(object_pose - palm_pose.p)
 
             if (
-                ee_pose_delta < 0.0005
+                ee_pose_delta < 0.001
                 and np.mean(handqpos2angle(delta_hand_qpos)) <= 1.2
             ):
                 # print("!!!!!!!!!!!!!!!!!!!!!!!!!!skip!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
@@ -825,5 +730,7 @@ if __name__ == "__main__":
     # bake_demonstration_svh_test()
     # bake_demonstration_ar10_test()
     # bake_demonstration_mano()
-    bake_visual_demonstration_test()
+    for i in range(1, 51):
+        bake_visual_demonstration_test(retarget=False, idx=i)
+    # bake_visual_demonstration_test()
     # bake_visual_real_demonstration_test()
