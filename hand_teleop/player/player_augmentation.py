@@ -38,8 +38,6 @@ from hand_teleop.player.player import *
 
 def create_env(args, demo, retarget=False):
 
-    random.seed()
-
     robot_name = args['robot_name']
 
     if robot_name == 'mano':
@@ -136,7 +134,7 @@ def create_env(args, demo, retarget=False):
     env.reset()
 
     real_camera_cfg = {"relocate_view": dict(
-        pose=lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(224, 224))}
+        pose=lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(640, 480))}
     env.setup_camera_from_config(real_camera_cfg)
 
     # Specify modality
@@ -419,6 +417,7 @@ def player_augmenting(args):
 
     for i in range(400):
         for demo_id, file_name in enumerate(demo_files):
+            random.seed()
             demo_idx = file_name.split("/")[-1].split(".")[0]
             num_test = 0
             # if demo_id <= 5:

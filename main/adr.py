@@ -54,6 +54,7 @@ def aug_in_adr(args, current_rank, demo_files):
         ########### Add new sim demos to the original dataset ###########
         file1 = h5py.File(f"{args['sim_aug_dataset_folder']}/dataset.h5", "a")
         for i in range(400):
+            np.random.seed(i)
             for _, file_name in enumerate(demo_files):
                 print(file_name)
                 demo_idx = file_name.split("/")[-1].split(".")[0]
