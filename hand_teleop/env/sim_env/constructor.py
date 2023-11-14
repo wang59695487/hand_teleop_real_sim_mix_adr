@@ -132,14 +132,12 @@ def generate_direction_in_scale(randomness_scale=1, num=1):
 
 
 def random_environment_map(scene: sapien.Scene, randomness_scale=1):
-    random.seed(int(time.time()))
     var = randomness_scale * 0.1
     scene.set_environment_map(create_dome_envmap(filename='/tmp/sapien_dome.ktx', sky_color=random.uniform(
         0.5-var, 0.5+var, size=3), ground_color=random.uniform(0.2-var, 0.2+var, size=3), blend=0.3, resolution=256))
 
 
 def random_scene_light(scene: sapien.Scene, renderer: sapien.VulkanRenderer, randomness_scale=1, add_ground=True, cast_shadow=True):
-    random.seed(int(time.time()))
     # If the light is already set, then we just skip the function.
     var = randomness_scale * 0.1
 

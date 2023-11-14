@@ -2,6 +2,7 @@ import shutil
 from typing import Dict, Any, Optional, List
 
 import numpy as np
+from numpy import random
 import sapien.core as sapien
 import transforms3d
 import pickle
@@ -36,6 +37,8 @@ from hand_teleop.player.player import *
 
 
 def create_env(args, demo, retarget=False):
+
+    random.seed()
 
     robot_name = args['robot_name']
 
@@ -245,6 +248,8 @@ def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_target, in
 
     if args['randomness_rank'] >= 2:
         env.random_map(var_adr_light)
+        env.random_light(var_adr_light)
+        env.generate_random_object_texture(var_adr_light)
     rgb_pics = []
 
     ################# Add 100 Interpolation steps ################
@@ -261,9 +266,9 @@ def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_target, in
         palm_next_pose = sapien.Pose([aug_obj[0], aug_obj[1], 0], [
             1, 0, 0, 0])*sapien.Pose(ee_pose_next[0:3], ee_pose_next[3:7])
         ########### Add Light Randomness ############
-        if args['randomness_rank'] >= 2 and i % 50 == 0:
-            env.random_light(var_adr_light)
-            env.generate_random_object_texture(var_adr_light)
+        # if args['randomness_rank'] >= 2 and i % 50 == 0:
+        #     env.random_light(var_adr_light)
+        #     env.generate_random_object_texture(var_adr_light)
 
         palm_next_pose = robot_pose.inv() * palm_next_pose
         palm_delta_pose = palm_pose.inv() * palm_next_pose
@@ -343,10 +348,10 @@ def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_target, in
                     palm_next_pose = sapien.Pose([aug_obj[0], aug_obj[1], 0], [
                                                  1, 0, 0, 0])*sapien.Pose(ee_pose_next[0:3], ee_pose_next[3:7])
 
-                ########### Add Light Randomness ############
-                if args['randomness_rank'] >= 2 and valid_frame % 50 == 0:
-                    env.random_light(var_adr_light)
-                    env.generate_random_object_texture(var_adr_light)
+                # ########### Add Light Randomness ############
+                # if args['randomness_rank'] >= 2 and valid_frame % 50 == 0:
+                #     env.random_light(var_adr_light)
+                #     env.generate_random_object_texture(var_adr_light)
 
                 palm_next_pose = robot_pose.inv() * palm_next_pose
                 palm_delta_pose = palm_pose.inv() * palm_next_pose
