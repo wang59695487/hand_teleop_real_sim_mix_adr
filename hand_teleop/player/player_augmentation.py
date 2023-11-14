@@ -133,7 +133,7 @@ def create_env(args, demo, retarget=False):
     env.reset()
 
     real_camera_cfg = {"relocate_view": dict(
-        pose=lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(224, 224))}
+        pose=lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(640, 480))}
     env.setup_camera_from_config(real_camera_cfg)
 
     # Specify modality
@@ -439,11 +439,11 @@ def player_augmenting(args):
             out_folder = f"./sim/raw_augmentation_action/{args['task_name']}_{args['object_name']}_aug/"
             os.makedirs(out_folder, exist_ok=True)
 
-            init_pose_aug_obj = sapien.Pose([-0.16, 0.3, 0], [1, 0, 0, 0])
-            init_pose_aug_target = sapien.Pose([x2, y2, 0], [1, 0, 0, 0])
+            init_pose_aug_obj = sapien.Pose([0, 0, 0], [1, 0, 0, 0])
+            init_pose_aug_target = sapien.Pose([0, 0, 0], [1, 0, 0, 0])
 
             info_success, video = generate_sim_aug_in_play_demo(
-                args, all_data, demo_idx, init_pose_aug_target, init_pose_aug_obj, var_adr_light=2, is_video=True)
+                args, all_data, demo_idx, init_pose_aug_target, init_pose_aug_obj, var_adr_light=3, is_video=True)
             # imageio.mimsave(
             #     f"./temp/demos/aug_{args['object_name']}/demo_{demo_id+1}_{num_test}_x1{x1:.2f}_y1{y1:.2f}_x2{x2:.2f}_y2{y2:.2f}.mp4", video, fps=120)
             # print(info_success)

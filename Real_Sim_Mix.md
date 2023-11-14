@@ -1,4 +1,5 @@
 [Experiment: Mix_Real_Sim Data](#user-content-experiment-simulated-data)
+
 ```bash
 
 ################################Mustard Bottle##########################################
@@ -38,7 +39,7 @@ nohup python main/train_act.py \
 
 ################################Tomato Soup Can##########################################
 #real demo: 34365   kinematic aug: 0
-nohup python hand_teleop/player/play_multiple_demonstrations_act.py --backbone-type=regnet_y_3_2gf --real-folder=real/raw_data/pick_place_tomato_soup_can --out-folder=real/baked_data/pick_place_tms --task-name=pick_place --object-name=tomato_soup_can --frame-skip=1 --real-delta-ee-pose-bound=0.001 --light-mode=default --img-data-aug=1  --kinematic-aug=0  > logs/play_sim 2>&1 & 
+python hand_teleop/player/play_multiple_demonstrations_act.py --backbone-type=mvp --task-name=pick_place --object-name=tomato_soup_can --real-folder=real/raw_data/pick_place_tomato_soup_can --out-folder=real/baked_data/pick_place_tms --frame-skip=1 --img-data-aug=5 --chunk-size=50 --real-delta-ee-pose-bound=0.001 --with-features=True 
 
 
 nohup python main/train_act.py \
@@ -76,20 +77,6 @@ nohup python main/train_act.py \
 
 nohup python main/train_act.py \
     --real-demo-folder=real/baked_data/pick_place_sg \
-    --ckpt=trained_models/sg_w_light_km_50_sim/epoch_best.pt \
-    --backbone-type=regnet_y_3_2gf \
-    --real-batch-size=32 \
-    --lr=1e-5 \
-    --kl_weight=20 \
-    --num_queries=50 \
-    --weight_decay=1e-2 \
-    --val-ratio=0.1 \
-    --num-epochs=3500 \
-    --eval-start-epoch=100 \
-    --eval-freq=100 > logs/train_real_act_0 2>&1 &
-
-nohup python main/train_act.py \
-    --real-demo-folder=real/baked_data/pick_place_sg \
     --ckpt=trained_models/sg_wo_light_km_50_sim/epoch_best.pt \
     --backbone-type=regnet_y_3_2gf \
     --real-batch-size=32 \
@@ -102,4 +89,53 @@ nohup python main/train_act.py \
     --eval-start-epoch=100 \
     --finetune \
     --eval-freq=100 > logs/finetune_real 2>&1 &
+
+################################pick_place##########################################
+python hand_teleop/player/play_multiple_demonstrations_act.py --backbone-type=pvr --real-folder=real/raw_data/pick_place_15 --out-folder=real/baked_data/pick_place_15 --frame-skip=1 --img-data-aug=5 --chunk-size=50 --real-delta-ee-pose-bound=0.001 --with-features=True
+
+python hand_teleop/player/play_multiple_demonstrations_act.py --real-folder=real/raw_data/pick_place_15 --out-folder=real/baked_data/pick_place_15 --frame-skip=1 --img-data-aug=5 --chunk-size=50 --real-delta-ee-pose-bound=0.001
+
+###########R3M, MVP, PVR #############
+###R3M: 2048
+###MVP: 768
+###PVR: 2048
+
+
+################################Pouring##########################################
+python hand_teleop/player/play_multiple_demonstrations_act.py --backbone-type=regnet_y_3_2gf --real-folder=real/raw_data/pouring --out-folder=real/baked_data/pouring --frame-skip=1 --img-data-aug=5 --chunk-size=50 --real-delta-ee-pose-bound=0.001 
+
+###########R3M, MVP, PVR #############
+###R3M: 2048
+###MVP: 768
+###PVR: 2048
+
+
+python hand_teleop/player/play_multiple_demonstrations_act.py --backbone-type=r3m --real-folder=real/raw_data/pouring --out-folder=real/baked_data/pouring --frame-skip=1 --real-delta-ee-pose-bound=0.001 --img-data-aug=5 --chunk-size=50 --with-features=True
+
+nohup python main/train_act.py \
+    --real-demo-folder=real/baked_data/pouring \
+    --backbone-type=regnet_y_3_2gf \
+    --real-batch-size=128 \
+    --lr=1e-5 \
+    --kl_weight=200 \
+    --num_queries=25 \
+    --weight_decay=1e-2 \
+    --val-ratio=0.1 \
+    --num-epochs=3500 \
+    --eval-start-epoch=100 \
+    --eval-freq=100 > logs/train_real_act_0 2>&1 &
+
+################################dclaw##########################################
+python hand_teleop/player/play_multiple_demonstrations_act.py --backbone-type=r3m --task-name=dclaw --real-folder=real/raw_data/dclaw --out-folder=real/baked_data/dclaw --frame-skip=1 --img-data-aug=5 --chunk-size=50 --real-delta-ee-pose-bound=0.001 --with-features=True 
+
+python hand_teleop/player/play_multiple_demonstrations_act.py --backbone-type=pvr --task-name=dclaw --real-folder=real/raw_data/dclaw --out-folder=real/baked_data/dclaw_pvr --frame-skip=1 --img-data-aug=5 --chunk-size=50 --real-delta-ee-pose-bound=0.001 --with-features=True 
+
+python hand_teleop/player/play_multiple_demonstrations_act.py --backbone-type=mvp --task-name=dclaw --real-folder=real/raw_data/dclaw --out-folder=real/baked_data/dclaw_mvp --frame-skip=1 --img-data-aug=5 --chunk-size=50 --real-delta-ee-pose-bound=0.001 --with-features=True 
+
+python hand_teleop/player/play_multiple_demonstrations_act.py --task-name=dclaw --real-folder=real/raw_data/dclaw --out-folder=real/baked_data/dclaw --frame-skip=1 --img-data-aug=5 --chunk-size=50 --real-delta-ee-pose-bound=0.001 
+
+###########R3M, MVP, PVR #############
+###R3M: 2048
+###MVP: 768
+###PVR: 2048
 ```

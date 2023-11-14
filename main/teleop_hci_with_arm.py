@@ -26,7 +26,7 @@ from hand_teleop.utils.render_scene_utils import set_entity_color
 from hand_teleop.teleop.teleop_client import TeleopClient
 
 
-## NOTE: THIS SCRIPT CAN ONLY CONTROL HAND CONNECTED TO THE ARM, FOR FREE HANDS/MANO USE teleop_hci_free_hand.py!!!
+# NOTE: THIS SCRIPT CAN ONLY CONTROL HAND CONNECTED TO THE ARM, FOR FREE HANDS/MANO USE teleop_hci_free_hand.py!!!
 def main():
     parser = ArgumentParser()
     parser.add_argument("--object", default=None, type=str)
@@ -55,7 +55,7 @@ def main():
         object_name = args.object
         assert object_name in object_names
     else:
-        object_name = object_names[-1]
+        object_name = object_names[-4]
     operator = "test"
     hand_mode = "right_hand"
     object_scale = 1
@@ -201,7 +201,8 @@ def main():
     robot_arm_control_params = (
         np.array([60000, 1000, 2000]) * arm_scale
     )  # This PD is far larger than real to improve stability
-    root_translation_control_params = np.array([10000, 1000, 2000]) * trans_scale
+    root_translation_control_params = np.array(
+        [10000, 1000, 2000]) * trans_scale
     root_rotation_control_params = np.array([2000, 200, 400]) * rot_scale
     finger_control_params = np.array([2000, 60, 10]) * fing_scale
     if robot_name == "mano":
@@ -233,7 +234,8 @@ def main():
         robot.set_qpos(qpos)
         robot.set_drive_target(qpos)
 
-        wrist = [link for link in robot.get_links() if link.get_name() == "wrist"]
+        wrist = [link for link in robot.get_links() if link.get_name()
+                 == "wrist"]
         wrist_pose = wrist[0].get_pose()
 
         # Robot
@@ -259,7 +261,8 @@ def main():
                     )
             robot.set_pose(
                 sapien.Pose(
-                    env_init_pos, transforms3d.euler.euler2quat(0, np.pi / 2, 0)
+                    env_init_pos, transforms3d.euler.euler2quat(
+                        0, np.pi / 2, 0)
                 )
             )
         elif "xarm" in robot_name:
@@ -383,7 +386,8 @@ def main():
             )
         elif robot_name != "mano":
             meta_data["finger_control_params"] = weight * finger_control_params
-            meta_data["robot_arm_control_params"] = weight * robot_arm_control_params
+            meta_data["robot_arm_control_params"] = weight * \
+                robot_arm_control_params
         recorder.dump(meta_data)
 
 

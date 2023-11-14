@@ -136,7 +136,8 @@ class DataPlayer:
             w = actor.get_angular_velocity()
             pose = actor.get_pose()
             actor_data = dict(
-                velocity=v, angular_velocity=w, pose=np.concatenate([pose.p, pose.q])
+                velocity=v, angular_velocity=w, pose=np.concatenate(
+                    [pose.p, pose.q])
             )
             data["actor"][actor.get_id()] = actor_data
 
@@ -160,7 +161,8 @@ class DataPlayer:
     ):
         assert human_robot_hand.free_root
         fix_global = len(retargeting.optimizer.fixed_joint_indices) == 6
-        assert fix_global or len(retargeting.optimizer.fixed_joint_indices) == 0
+        assert fix_global or len(
+            retargeting.optimizer.fixed_joint_indices) == 0
 
         links = human_robot_hand.finger_tips
         if indices is not None:
@@ -173,7 +175,8 @@ class DataPlayer:
             fixed_qpos = human_robot_hand.robot.get_qpos()[:6]
 
         if use_root_local_pose:
-            base_pose_inv = human_robot_hand.robot.get_links()[0].get_pose().inv()
+            base_pose_inv = human_robot_hand.robot.get_links()[
+                0].get_pose().inv()
             human_hand_joints = np.stack(
                 [(base_pose_inv * link.get_pose()).p for link in links]
             )
@@ -182,7 +185,8 @@ class DataPlayer:
             human_hand_joints = np.stack(
                 [(base_pose_inv * link.get_pose()).p for link in links]
             )
-        robot_qpos = retargeting.retarget(human_hand_joints, fixed_qpos=fixed_qpos)
+        robot_qpos = retargeting.retarget(
+            human_hand_joints, fixed_qpos=fixed_qpos)
         return robot_qpos
 
     def get_finger_tip_middle_retargeting_result(
@@ -194,7 +198,8 @@ class DataPlayer:
     ):
         assert human_robot_hand.free_root
         fix_global = len(retargeting.optimizer.fixed_joint_indices) == 6
-        assert fix_global or len(retargeting.optimizer.fixed_joint_indices) == 0
+        assert fix_global or len(
+            retargeting.optimizer.fixed_joint_indices) == 0
 
         links = human_robot_hand.finger_tips + human_robot_hand.finger_middles
         if indices is not None:
@@ -207,7 +212,8 @@ class DataPlayer:
             fixed_qpos = human_robot_hand.robot.get_qpos()[:6]
 
         if use_root_local_pose:
-            base_pose_inv = human_robot_hand.robot.get_links()[0].get_pose().inv()
+            base_pose_inv = human_robot_hand.robot.get_links()[
+                0].get_pose().inv()
             human_hand_joints = np.stack(
                 [(base_pose_inv * link.get_pose()).p for link in links]
             )
@@ -219,7 +225,8 @@ class DataPlayer:
 
         if np.allclose(retargeting.last_qpos, np.zeros(retargeting.optimizer.dof)):
             retargeting.last_qpos[:6] = human_robot_hand.robot.get_qpos()[:6]
-        robot_qpos = retargeting.retarget(human_hand_joints, fixed_qpos=fixed_qpos)
+        robot_qpos = retargeting.retarget(
+            human_hand_joints, fixed_qpos=fixed_qpos)
         return robot_qpos
 
     def compute_action_from_states(self, robot_qpos_prev, robot_qpos, is_contact: bool):
@@ -229,12 +236,15 @@ class DataPlayer:
         if not self.env.is_robot_free:
             arm_dof = self.env.arm_dof
             end_link = self.env.kinematic_model.partial_robot.get_links()[-1]
-            self.env.kinematic_model.partial_robot.set_qpos(robot_qpos_prev[:arm_dof])
+            self.env.kinematic_model.partial_robot.set_qpos(
+                robot_qpos_prev[:arm_dof])
             prev_link_pose = end_link.get_pose()
-            self.env.kinematic_model.partial_robot.set_qpos(robot_qpos[:arm_dof])
+            self.env.kinematic_model.partial_robot.set_qpos(
+                robot_qpos[:arm_dof])
             current_link_pose = end_link.get_pose()
             delta_pose_spatial = current_link_pose * prev_link_pose.inv()
-            axis, angle = transforms3d.quaternions.quat2axangle(delta_pose_spatial.q)
+            axis, angle = transforms3d.quaternions.quat2axangle(
+                delta_pose_spatial.q)
             target_velocity = (
                 np.concatenate([delta_pose_spatial.p, axis * angle]) / duration
             )
@@ -242,7 +252,8 @@ class DataPlayer:
             delta_qpos = robot_qpos[:6] - robot_qpos_prev[:6]
             target_velocity = delta_qpos / duration
         target_velocity = np.clip(
-            (target_velocity - v_limit[:, 0]) / (v_limit[:, 1] - v_limit[:, 0]) * 2 - 1,
+            (target_velocity - v_limit[:, 0]) /
+            (v_limit[:, 1] - v_limit[:, 0]) * 2 - 1,
             -1,
             1,
         )
@@ -257,7 +268,8 @@ class DataPlayer:
         limit = self.env.robot.get_qlimits()[6:]
         target_position = robot_qpos[6:]
         target_position = np.clip(
-            (target_position - limit[:, 0]) / (limit[:, 1] - limit[:, 0]) * pos_gain
+            (target_position - limit[:, 0]) /
+            (limit[:, 1] - limit[:, 0]) * pos_gain
             - 1,
             -1,
             1,
@@ -292,7 +304,8 @@ class RelocateObjectEnvPlayer(DataPlayer):
         target_pose = manipulated_object.get_pose()
         self.env.target_object.set_pose(target_pose)
         self.env.target_pose = target_pose
-        baked_data["target_pose"] = np.concatenate([target_pose.p, target_pose.q])
+        baked_data["target_pose"] = np.concatenate(
+            [target_pose.p, target_pose.q])
         self.scene.step()
 
         for i in range(self.meta_data["data_len"]):
@@ -319,7 +332,8 @@ class RelocateObjectEnvPlayer(DataPlayer):
                         use_root_local_pose=use_local_pose,
                     )
                 else:
-                    raise ValueError(f"Retargeting method {method} is not supported")
+                    raise ValueError(
+                        f"Retargeting method {method} is not supported")
             else:
                 qpos = self.env.robot.get_qpos()
             baked_data["robot_qpos"].append(qpos)
@@ -338,13 +352,15 @@ class RelocateObjectEnvPlayer(DataPlayer):
                     baked_data["action"][-1][6:] - baked_data["action"][-2][6:]
                 ) / duration
                 root_qvel = baked_data["action"][-1][:6]
-                self.env.robot.set_qvel(np.concatenate([root_qvel, finger_qvel]))
+                self.env.robot.set_qvel(
+                    np.concatenate([root_qvel, finger_qvel]))
 
             # Environment observation
             baked_data["obs"].append(self.env.get_observation())
 
             # Environment state
-            baked_data["state"].append(self.collect_env_state([manipulated_object]))
+            baked_data["state"].append(
+                self.collect_env_state([manipulated_object]))
 
         baked_data["action"].append(baked_data["action"][-1])
         return baked_data
@@ -407,7 +423,8 @@ class FlipMugEnvPlayer(DataPlayer):
                         use_root_local_pose=use_local_pose,
                     )
                 else:
-                    raise ValueError(f"Retargeting method {method} is not supported")
+                    raise ValueError(
+                        f"Retargeting method {method} is not supported")
             else:
                 if self.env.robot_name == "mano":
                     qpos = self.human_robot_hand.robot.get_qpos()
@@ -418,7 +435,8 @@ class FlipMugEnvPlayer(DataPlayer):
                 baked_data["robot_qvel"].append(qvel)
             baked_data["robot_qpos"].append(qpos)
             ee_pose = self.env.ee_link.get_pose()
-            baked_data["ee_pose"].append(np.concatenate([ee_pose.p, ee_pose.q]))
+            baked_data["ee_pose"].append(
+                np.concatenate([ee_pose.p, ee_pose.q]))
             self.env.robot.set_qpos(qpos)
             if self.env.robot_name == "mano":
                 # NOTE: Action i is the transition from state i to state i+1
@@ -439,21 +457,24 @@ class FlipMugEnvPlayer(DataPlayer):
                     if i >= 2:
                         duration = self.env.frame_skip * self.scene.get_timestep()
                         finger_qvel = (
-                            baked_data["action"][-1][6:] - baked_data["action"][-2][6:]
+                            baked_data["action"][-1][6:] -
+                            baked_data["action"][-2][6:]
                         ) / duration
                         root_qvel = baked_data["action"][-1][:6]
                         self.env.robot.set_qvel(
                             np.concatenate([root_qvel, finger_qvel])
                         )
                 else:
-                    baked_data["action"].append(self.env.robot.get_drive_target())
+                    baked_data["action"].append(
+                        self.env.robot.get_drive_target())
                     self.env.robot.set_qvel(qvel)
 
             # Environment observation
             baked_data["obs"].append(self.env.get_observation())
 
             # Environment state
-            baked_data["state"].append(self.collect_env_state([manipulated_object]))
+            baked_data["state"].append(
+                self.collect_env_state([manipulated_object]))
 
         if use_human_hand:
             baked_data["action"].append(baked_data["action"][-1])
@@ -517,7 +538,8 @@ class TableDoorEnvPlayer(DataPlayer):
                         use_root_local_pose=use_local_pose,
                     )
                 else:
-                    raise ValueError(f"Retargeting method {method} is not supported")
+                    raise ValueError(
+                        f"Retargeting method {method} is not supported")
             else:
                 if self.env.robot_name == "mano":
                     qpos = self.human_robot_hand.robot.get_qpos()
@@ -528,7 +550,8 @@ class TableDoorEnvPlayer(DataPlayer):
                 baked_data["robot_qvel"].append(qvel)
             baked_data["robot_qpos"].append(qpos)
             ee_pose = self.env.ee_link.get_pose()
-            baked_data["ee_pose"].append(np.concatenate([ee_pose.p, ee_pose.q]))
+            baked_data["ee_pose"].append(
+                np.concatenate([ee_pose.p, ee_pose.q]))
             self.env.robot.set_qpos(qpos)
             if self.env.robot_name == "mano":
                 # NOTE: Action i is the transition from state i to state i+1
@@ -549,14 +572,16 @@ class TableDoorEnvPlayer(DataPlayer):
                     if i >= 2:
                         duration = self.env.frame_skip * self.scene.get_timestep()
                         finger_qvel = (
-                            baked_data["action"][-1][6:] - baked_data["action"][-2][6:]
+                            baked_data["action"][-1][6:] -
+                            baked_data["action"][-2][6:]
                         ) / duration
                         root_qvel = baked_data["action"][-1][:6]
                         self.env.robot.set_qvel(
                             np.concatenate([root_qvel, finger_qvel])
                         )
                 else:
-                    baked_data["action"].append(self.env.robot.get_drive_target())
+                    baked_data["action"].append(
+                        self.env.robot.get_drive_target())
                     self.env.robot.set_qvel(qvel)
 
             # Environment observation
@@ -626,7 +651,8 @@ class LaptopEnvPlayer(DataPlayer):
                         use_root_local_pose=use_local_pose,
                     )
                 else:
-                    raise ValueError(f"Retargeting method {method} is not supported")
+                    raise ValueError(
+                        f"Retargeting method {method} is not supported")
             else:
                 if self.env.robot_name == "mano":
                     qpos = self.human_robot_hand.robot.get_qpos()
@@ -637,7 +663,8 @@ class LaptopEnvPlayer(DataPlayer):
                 baked_data["robot_qvel"].append(qvel)
             baked_data["robot_qpos"].append(qpos)
             ee_pose = self.env.ee_link.get_pose()
-            baked_data["ee_pose"].append(np.concatenate([ee_pose.p, ee_pose.q]))
+            baked_data["ee_pose"].append(
+                np.concatenate([ee_pose.p, ee_pose.q]))
             self.env.robot.set_qpos(qpos)
             if self.env.robot_name == "mano":
                 # NOTE: Action i is the transition from state i to state i+1
@@ -658,14 +685,16 @@ class LaptopEnvPlayer(DataPlayer):
                     if i >= 2:
                         duration = self.env.frame_skip * self.scene.get_timestep()
                         finger_qvel = (
-                            baked_data["action"][-1][6:] - baked_data["action"][-2][6:]
+                            baked_data["action"][-1][6:] -
+                            baked_data["action"][-2][6:]
                         ) / duration
                         root_qvel = baked_data["action"][-1][:6]
                         self.env.robot.set_qvel(
                             np.concatenate([root_qvel, finger_qvel])
                         )
                 else:
-                    baked_data["action"].append(self.env.robot.get_drive_target())
+                    baked_data["action"].append(
+                        self.env.robot.get_drive_target())
                     self.env.robot.set_qvel(qvel)
 
             # Environment observation
@@ -735,7 +764,8 @@ class PickPlaceEnvPlayer(DataPlayer):
                         use_root_local_pose=use_local_pose,
                     )
                 else:
-                    raise ValueError(f"Retargeting method {method} is not supported")
+                    raise ValueError(
+                        f"Retargeting method {method} is not supported")
             else:
                 if self.env.robot_name == "mano":
                     qpos = self.human_robot_hand.robot.get_qpos()
@@ -746,7 +776,8 @@ class PickPlaceEnvPlayer(DataPlayer):
                 baked_data["robot_qvel"].append(qvel)
             baked_data["robot_qpos"].append(qpos)
             ee_pose = self.env.ee_link.get_pose()
-            baked_data["ee_pose"].append(np.concatenate([ee_pose.p, ee_pose.q]))
+            baked_data["ee_pose"].append(
+                np.concatenate([ee_pose.p, ee_pose.q]))
             self.env.robot.set_qpos(qpos)
             if self.env.robot_name == "mano":
                 # NOTE: Action i is the transition from state i to state i+1
@@ -767,20 +798,23 @@ class PickPlaceEnvPlayer(DataPlayer):
                     if i >= 2:
                         duration = self.env.frame_skip * self.scene.get_timestep()
                         finger_qvel = (
-                            baked_data["action"][-1][6:] - baked_data["action"][-2][6:]
+                            baked_data["action"][-1][6:] -
+                            baked_data["action"][-2][6:]
                         ) / duration
                         root_qvel = baked_data["action"][-1][:6]
                         self.env.robot.set_qvel(
                             np.concatenate([root_qvel, finger_qvel])
                         )
                 else:
-                    baked_data["action"].append(self.env.robot.get_drive_target())
+                    baked_data["action"].append(
+                        self.env.robot.get_drive_target())
                     self.env.robot.set_qvel(qvel)
 
             # Environment observation
             baked_data["obs"].append(self.env.get_observation())
             # Environment state
-            baked_data["state"].append(self.collect_env_state([manipulated_object]))
+            baked_data["state"].append(
+                self.collect_env_state([manipulated_object]))
 
         if use_human_hand:
             baked_data["action"].append(baked_data["action"][-1])
@@ -822,7 +856,8 @@ class PenDrawEnvPlayer(DataPlayer):
 
             # Robot qpos
             if use_human_hand:
-                contact_finger_index = self.human_robot_hand.check_contact_finger([pen])
+                contact_finger_index = self.human_robot_hand.check_contact_finger([
+                                                                                  pen])
                 if method == "tip_middle":
                     qpos = self.get_finger_tip_middle_retargeting_result(
                         self.human_robot_hand,
@@ -838,7 +873,8 @@ class PenDrawEnvPlayer(DataPlayer):
                         use_root_local_pose=use_local_pose,
                     )
                 else:
-                    raise ValueError(f"Retargeting method {method} is not supported")
+                    raise ValueError(
+                        f"Retargeting method {method} is not supported")
             else:
                 if self.env.robot_name == "mano":
                     qpos = self.human_robot_hand.robot.get_qpos()
@@ -851,7 +887,8 @@ class PenDrawEnvPlayer(DataPlayer):
             baked_data["robot_qpos"].append(qpos)
             baked_data["robot_qvel"].append(qvel)
             ee_pose = self.env.ee_link.get_pose()
-            baked_data["ee_pose"].append(np.concatenate([ee_pose.p, ee_pose.q]))
+            baked_data["ee_pose"].append(
+                np.concatenate([ee_pose.p, ee_pose.q]))
             self.env.robot.set_qpos(qpos)
             if self.env.robot_name == "mano":
                 # action i is the transition from state i to state i
@@ -872,7 +909,8 @@ class PenDrawEnvPlayer(DataPlayer):
                     if i >= 2:
                         duration = self.env.frame_skip * self.scene.get_timestep()
                         finger_qvel = (
-                            baked_data["action"][-1][6:] - baked_data["action"][-2][6:]
+                            baked_data["action"][-1][6:] -
+                            baked_data["action"][-2][6:]
                         ) / duration
                         root_qvel = baked_data["action"][-1][:6]
                         self.env.robot.set_qvel(
@@ -949,7 +987,8 @@ class HammerEnvPlayer(DataPlayer):
                         use_root_local_pose=use_local_pose,
                     )
                 else:
-                    raise ValueError(f"Retargeting method {method} is not supported")
+                    raise ValueError(
+                        f"Retargeting method {method} is not supported")
             else:
                 if self.env.robot_name == "mano":
                     qpos = self.human_robot_hand.robot.get_qpos()
@@ -960,7 +999,8 @@ class HammerEnvPlayer(DataPlayer):
                 baked_data["robot_qvel"].append(qvel)
             baked_data["robot_qpos"].append(qpos)
             ee_pose = self.env.ee_link.get_pose()
-            baked_data["ee_pose"].append(np.concatenate([ee_pose.p, ee_pose.q]))
+            baked_data["ee_pose"].append(
+                np.concatenate([ee_pose.p, ee_pose.q]))
             self.env.robot.set_qpos(qpos)
             if self.env.robot_name == "mano":
                 # NOTE: Action i is the transition from state i to state i+1
@@ -981,14 +1021,16 @@ class HammerEnvPlayer(DataPlayer):
                     if i >= 2:
                         duration = self.env.frame_skip * self.scene.get_timestep()
                         finger_qvel = (
-                            baked_data["action"][-1][6:] - baked_data["action"][-2][6:]
+                            baked_data["action"][-1][6:] -
+                            baked_data["action"][-2][6:]
                         ) / duration
                         root_qvel = baked_data["action"][-1][:6]
                         self.env.robot.set_qvel(
                             np.concatenate([root_qvel, finger_qvel])
                         )
                 else:
-                    baked_data["action"].append(self.env.robot.get_drive_target())
+                    baked_data["action"].append(
+                        self.env.robot.get_drive_target())
                     self.env.robot.set_qvel(qvel)
 
             # Environment observation
@@ -1056,7 +1098,8 @@ class InsertObjectEnvPlayer(DataPlayer):
                         use_root_local_pose=use_local_pose,
                     )
                 else:
-                    raise ValueError(f"Retargeting method {method} is not supported")
+                    raise ValueError(
+                        f"Retargeting method {method} is not supported")
             else:
                 if self.env.robot_name == "mano":
                     qpos = self.human_robot_hand.robot.get_qpos()
@@ -1067,7 +1110,8 @@ class InsertObjectEnvPlayer(DataPlayer):
                 baked_data["robot_qvel"].append(qvel)
             baked_data["robot_qpos"].append(qpos)
             ee_pose = self.env.ee_link.get_pose()
-            baked_data["ee_pose"].append(np.concatenate([ee_pose.p, ee_pose.q]))
+            baked_data["ee_pose"].append(
+                np.concatenate([ee_pose.p, ee_pose.q]))
             self.env.robot.set_qpos(qpos)
             if self.env.robot_name == "mano":
                 # NOTE: Action i is the transition from state i to state i+1
@@ -1088,20 +1132,23 @@ class InsertObjectEnvPlayer(DataPlayer):
                     if i >= 2:
                         duration = self.env.frame_skip * self.scene.get_timestep()
                         finger_qvel = (
-                            baked_data["action"][-1][6:] - baked_data["action"][-2][6:]
+                            baked_data["action"][-1][6:] -
+                            baked_data["action"][-2][6:]
                         ) / duration
                         root_qvel = baked_data["action"][-1][:6]
                         self.env.robot.set_qvel(
                             np.concatenate([root_qvel, finger_qvel])
                         )
                 else:
-                    baked_data["action"].append(self.env.robot.get_drive_target())
+                    baked_data["action"].append(
+                        self.env.robot.get_drive_target())
                     self.env.robot.set_qvel(qvel)
 
             # Environment observation
             baked_data["obs"].append(self.env.get_observation())
             # Environment state
-            baked_data["state"].append(self.collect_env_state([manipulated_object]))
+            baked_data["state"].append(
+                self.collect_env_state([manipulated_object]))
 
         if use_human_hand:
             baked_data["action"].append(baked_data["action"][-1])
@@ -1196,7 +1243,8 @@ def bake_demonstration_allegro_test(retarget=False):
                         *(1 * robot_arm_control_params), mode="force"
                     )
                 else:
-                    joint.set_drive_property(*(1 * finger_control_params), mode="force")
+                    joint.set_drive_property(
+                        *(1 * finger_control_params), mode="force")
             env.rl_step = env.simple_sim_step
     env.reset()
     viewer = env.render(mode="human")
@@ -1247,7 +1295,8 @@ def bake_demonstration_allegro_test(retarget=False):
             "link_10.0",
         ]
         indices = [0, 1, 2, 3, 5, 6, 7, 8]
-        joint_names = [joint.get_name() for joint in env.robot.get_active_joints()]
+        joint_names = [joint.get_name()
+                       for joint in env.robot.get_active_joints()]
         retargeting = PositionRetargeting(
             env.robot,
             joint_names,
@@ -1282,7 +1331,8 @@ def bake_demonstration_allegro_test(retarget=False):
     robot_pose = env.robot.get_pose()
     rotation_matrix = transforms3d.quaternions.quat2mat(robot_pose.q)
     world_to_robot = transforms3d.affines.compose(
-        -np.matmul(rotation_matrix.T, robot_pose.p), rotation_matrix.T, np.ones(3)
+        -np.matmul(rotation_matrix.T,
+                   robot_pose.p), rotation_matrix.T, np.ones(3)
     )
     delta_catesian_action = []
     for idx, (obs, qpos, state, action, ee_pose) in enumerate(
@@ -1310,7 +1360,8 @@ def bake_demonstration_allegro_test(retarget=False):
             if delta_angle > np.pi:
                 delta_angle = 2 * np.pi - delta_angle
                 delta_axis = -delta_axis
-            delta_axis_world = palm_pose.to_transformation_matrix()[:3, :3] @ delta_axis
+            delta_axis_world = palm_pose.to_transformation_matrix()[
+                :3, :3] @ delta_axis
             delta_pose = np.concatenate(
                 [palm_next_pose.p - palm_pose.p, delta_axis_world * delta_angle]
             )
@@ -1325,7 +1376,7 @@ def bake_demonstration_allegro_test(retarget=False):
                 : env.arm_dof
             ]
             arm_qpos = arm_qvel + env.robot.get_qpos()[: env.arm_dof]
-            hand_qpos = action[env.arm_dof :]
+            hand_qpos = action[env.arm_dof:]
             target_qpos = np.concatenate([arm_qpos, hand_qpos])
             env.step(target_qpos)
             env.render()
@@ -1356,7 +1407,8 @@ def bake_demonstration_panda_test():
     all_data = np.load(str(path.resolve()), allow_pickle=True)
     meta_data = all_data["meta_data"]
     data = all_data["data"]
-    env = RelocateRLEnv(**meta_data["env_kwargs"], robot_name=robot_name, use_gui=True)
+    env = RelocateRLEnv(**meta_data["env_kwargs"],
+                        robot_name=robot_name, use_gui=True)
     player = RelocateObjectEnvPlayer(
         meta_data, data, env, zero_joint_pos=meta_data["zero_joint_pos"]
     )
@@ -1391,7 +1443,8 @@ def bake_demonstration_panda_test():
     player.scene.remove_articulation(player.human_robot_hand.robot)
     actor_id = env.manipulated_object.get_id()
     target_pose_vec = baked_data["target_pose"]
-    env.target_object.set_pose(sapien.Pose(target_pose_vec[:3], target_pose_vec[3:]))
+    env.target_object.set_pose(sapien.Pose(
+        target_pose_vec[:3], target_pose_vec[3:]))
     for obs, qpos, state, action in zip(
         baked_data["obs"],
         baked_data["robot_qpos"],
@@ -1402,7 +1455,8 @@ def bake_demonstration_panda_test():
         # print(action[:6])
         # print(env.reward())
         object_pose = state["actor"][actor_id]["pose"]
-        env.manipulated_object.set_pose(sapien.Pose(object_pose[:3], object_pose[3:7]))
+        env.manipulated_object.set_pose(
+            sapien.Pose(object_pose[:3], object_pose[3:7]))
 
         for _ in range(3):
             env.render()
@@ -1527,7 +1581,7 @@ def bake_demonstration_mano():
 def average_angle_handqpos(hand_qpos):
     delta_angles = []
     for i in range(0, len(hand_qpos), 4):
-        qpos = hand_qpos[i : i + 4]
+        qpos = hand_qpos[i: i + 4]
         delta_axis, delta_angle = transforms3d.quaternions.quat2axangle(qpos)
         if delta_angle > np.pi:
             delta_angle = 2 * np.pi - delta_angle
@@ -1627,7 +1681,8 @@ def bake_visual_demonstration_test(retarget=False):
                         *(1 * robot_arm_control_params), mode="force"
                     )
                 else:
-                    joint.set_drive_property(*(1 * finger_control_params), mode="force")
+                    joint.set_drive_property(
+                        *(1 * finger_control_params), mode="force")
             env.rl_step = env.simple_sim_step
     env.reset()
     viewer = env.render(mode="human")
@@ -1659,7 +1714,8 @@ def bake_visual_demonstration_test(retarget=False):
 
     # Specify modality
     empty_info = {}  # level empty dict for now, reserved for future
-    camera_info = {"relocate_view": {"rgb": empty_info, "segmentation": empty_info}}
+    camera_info = {"relocate_view": {
+        "rgb": empty_info, "segmentation": empty_info}}
     env.setup_visual_obs_config(camera_info)
 
     # Player
@@ -1700,7 +1756,8 @@ def bake_visual_demonstration_test(retarget=False):
             "link_10.0",
         ]
         indices = [0, 1, 2, 3, 5, 6, 7, 8]
-        joint_names = [joint.get_name() for joint in env.robot.get_active_joints()]
+        joint_names = [joint.get_name()
+                       for joint in env.robot.get_active_joints()]
         retargeting = PositionRetargeting(
             env.robot,
             joint_names,
@@ -1729,7 +1786,8 @@ def bake_visual_demonstration_test(retarget=False):
     robot_pose = env.robot.get_pose()
     rotation_matrix = transforms3d.quaternions.quat2mat(robot_pose.q)
     world_to_robot = transforms3d.affines.compose(
-        -np.matmul(rotation_matrix.T, robot_pose.p), rotation_matrix.T, np.ones(3)
+        -np.matmul(rotation_matrix.T,
+                   robot_pose.p), rotation_matrix.T, np.ones(3)
     )
     delta_catesian_action = []
 
@@ -1747,8 +1805,9 @@ def bake_visual_demonstration_test(retarget=False):
         # NOTE: robot.get_qpos() version
         if idx != len(baked_data["obs"]) - 1:
             ee_pose_next = baked_data["ee_pose"][idx + 1]
-            ee_pose_delta = np.sqrt(np.sum((ee_pose_next[:3] - ee_pose[:3]) ** 2))
-            hand_qpos = baked_data["action"][idx][env.arm_dof :]
+            ee_pose_delta = np.sqrt(
+                np.sum((ee_pose_next[:3] - ee_pose[:3]) ** 2))
+            hand_qpos = baked_data["action"][idx][env.arm_dof:]
 
             # delta_hand_qpos = hand_qpos - hand_qpos_prev if idx!=0 else hand_qpos
             # if ee_pose_delta > 0.0005 and average_angle_handqpos(delta_hand_qpos)>=np.pi/180 :
@@ -1759,7 +1818,8 @@ def bake_visual_demonstration_test(retarget=False):
                 palm_pose = env.ee_link.get_pose()
                 palm_pose = robot_pose.inv() * palm_pose
 
-                palm_next_pose = sapien.Pose(ee_pose_next[0:3], ee_pose_next[3:7])
+                palm_next_pose = sapien.Pose(
+                    ee_pose_next[0:3], ee_pose_next[3:7])
                 palm_next_pose = robot_pose.inv() * palm_next_pose
 
                 palm_delta_pose = palm_pose.inv() * palm_next_pose
@@ -1773,7 +1833,8 @@ def bake_visual_demonstration_test(retarget=False):
                     palm_pose.to_transformation_matrix()[:3, :3] @ delta_axis
                 )
                 delta_pose = np.concatenate(
-                    [palm_next_pose.p - palm_pose.p, delta_axis_world * delta_angle]
+                    [palm_next_pose.p - palm_pose.p,
+                        delta_axis_world * delta_angle]
                 )
 
                 palm_jacobian = env.kinematic_model.compute_end_link_spatial_jacobian(
@@ -1783,7 +1844,7 @@ def bake_visual_demonstration_test(retarget=False):
                     : env.arm_dof
                 ]
                 arm_qpos = arm_qvel + env.robot.get_qpos()[: env.arm_dof]
-                hand_qpos = action[env.arm_dof :]
+                hand_qpos = action[env.arm_dof:]
                 target_qpos = np.concatenate([arm_qpos, hand_qpos])
                 visual_baked["obs"].append(env.get_observation())
                 visual_baked["action"].append(
@@ -1807,7 +1868,8 @@ def bake_visual_demonstration_test(retarget=False):
     for i in range(len(visual_baked["obs"])):
         rgb = visual_baked["obs"][i]["relocate_view-rgb"]
         rgb_pic = (rgb * 255).astype(np.uint8)
-        imageio.imsave("./temp/demos/player/relocate-rgb_{}.png".format(i), rgb_pic)
+        imageio.imsave(
+            "./temp/demos/player/relocate-rgb_{}.png".format(i), rgb_pic)
 
 
 def bake_visual_real_demonstration_test(retarget=False, index=0):
@@ -1816,9 +1878,9 @@ def bake_visual_real_demonstration_test(retarget=False, index=0):
     # Recorder
     shutil.rmtree("./temp/demos/player", ignore_errors=True)
     os.makedirs("./temp/demos/player")
-    # path = "./sim/raw_data/xarm/less_random/pick_place_mustard_bottle/mustard_bottle_0002.pickle"
+    path = "./sim/raw_data/pick_place_mustard_bottle/mustard_bottle_0002.pickle"
     # path = "./sim/raw_data/xarm/less_random/pick_place_sugar_box/sugar_box_0001.pickle"
-    path = "sim/raw_data/pick_place_tomato_soup_can/tomato_soup_can_0001.pickle"
+    # path = "sim/raw_data/pick_place_tomato_soup_can/tomato_soup_can_0001.pickle"
 
     all_data = np.load(path, allow_pickle=True)
     meta_data = all_data["meta_data"]
@@ -1908,7 +1970,8 @@ def bake_visual_real_demonstration_test(retarget=False, index=0):
                         *(1 * robot_arm_control_params), mode="force"
                     )
                 else:
-                    joint.set_drive_property(*(1 * finger_control_params), mode="force")
+                    joint.set_drive_property(
+                        *(1 * finger_control_params), mode="force")
             env.rl_step = env.simple_sim_step
     env.reset()
     viewer = env.render(mode="human")
@@ -1944,7 +2007,8 @@ def bake_visual_real_demonstration_test(retarget=False, index=0):
 
     # Specify modality
     empty_info = {}  # level empty dict for now, reserved for future
-    camera_info = {"relocate_view": {"rgb": empty_info, "segmentation": empty_info}}
+    camera_info = {"relocate_view": {
+        "rgb": empty_info, "segmentation": empty_info}}
     env.setup_visual_obs_config(camera_info)
 
     # Player
@@ -1986,7 +2050,8 @@ def bake_visual_real_demonstration_test(retarget=False, index=0):
             "link_10.0",
         ]
         indices = [0, 1, 2, 3, 5, 6, 7, 8]
-        joint_names = [joint.get_name() for joint in env.robot.get_active_joints()]
+        joint_names = [joint.get_name()
+                       for joint in env.robot.get_active_joints()]
         retargeting = PositionRetargeting(
             env.robot,
             joint_names,
@@ -2001,7 +2066,8 @@ def bake_visual_real_demonstration_test(retarget=False, index=0):
         # record_root  = "./real/raw_data/pick_place_mustard_bottle"
         # record_root = "./real/raw_data/pick_place_tomato_soup_can"
         # record_root  = "./real/raw_data/pick_place_sugar_box"
-        record_root = "./real/raw_data/reorientation_extend"
+        # record_root = "./real/raw_data/reorientation_extend"
+        record_root = "./real/raw_data/pick_place"
         record_path = Path(record_root) / f"{index:04}.pkl"
         # path = "./real/raw_data/pick_place_mustard_bottle/0001.pkl"
         baked_data = np.load(record_path, allow_pickle=True)
@@ -2023,7 +2089,8 @@ def bake_visual_real_demonstration_test(retarget=False, index=0):
     robot_pose = env.robot.get_pose()
     rotation_matrix = transforms3d.quaternions.quat2mat(robot_pose.q)
     world_to_robot = transforms3d.affines.compose(
-        -np.matmul(rotation_matrix.T, robot_pose.p), rotation_matrix.T, np.ones(3)
+        -np.matmul(rotation_matrix.T,
+                   robot_pose.p), rotation_matrix.T, np.ones(3)
     )
 
     for idx in range(len(baked_data)):
@@ -2032,7 +2099,7 @@ def bake_visual_real_demonstration_test(retarget=False, index=0):
         # print(baked_data[idx]["ee_pose"])
         # NOTE: robot.get_qpos() version
         if idx != len(baked_data) - 1:
-            hand_qpos = baked_data[idx + 1]["teleop_cmd"][env.arm_dof :]
+            hand_qpos = baked_data[idx + 1]["teleop_cmd"][env.arm_dof:]
             arm_qpos = baked_data[idx + 1]["teleop_cmd"][: env.arm_dof]
 
             target_qpos = np.concatenate([arm_qpos, hand_qpos])
@@ -2056,5 +2123,5 @@ if __name__ == "__main__":
     # bake_demonstration_ar10_test()
     # bake_demonstration_mano()
     # bake_visual_demonstration_test()
-    for i in range(30, 50):
+    for i in range(0, 45):
         bake_visual_real_demonstration_test(index=i)

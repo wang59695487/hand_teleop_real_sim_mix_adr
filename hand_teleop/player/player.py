@@ -46,13 +46,14 @@ def handqpos2angle(hand_qpos):
     return delta_angles
 
 
-def create_env_test(retarget=False, idx=1):
+def create_env_test(retarget=False, idx=2):
     # Recorder
     # shutil.rmtree('./temp/demos/player', ignore_errors=True)
     # os.makedirs('./temp/demos/player')
     # path = f"./sim/raw_data/pick_place_mustard_bottle/mustard_bottle_{idx:004d}.pickle"
-    path = f"./sim/raw_data/dclaw/dclaw_3x_{idx:004d}.pickle"
+    # path = f"./sim/raw_data/dclaw/dclaw_3x_{idx:004d}.pickle"
     # path = f"./sim/raw_data/pick_place/bottle_1_{idx:004d}.pickle"
+    path = f"./sim/raw_data/pour/chip_can_{idx:004d}.pickle"
     all_data = np.load(path, allow_pickle=True)
     meta_data = all_data["meta_data"]
     task_name = meta_data["env_kwargs"]["task_name"]
@@ -91,7 +92,7 @@ def create_env_test(retarget=False, idx=1):
     # env_params["object_name"] = "dclaw_4x_90"
     # env_params["object_name"] = "dclaw_5x_60"
     # env_params["object_name"] = "dclaw_5x_72"
-    env_params["object_name"] = "dclaw_5x_75"
+    # env_params["object_name"] = "dclaw_5x_75"
 
     if "CUDA_VISIBLE_DEVICES" in os.environ:
         env_params["device"] = "cuda"
@@ -154,7 +155,7 @@ def create_env_test(retarget=False, idx=1):
 
     real_camera_cfg = {
         "relocate_view": dict(
-            pose=lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(224, 224)
+            pose=lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(640, 480)
         )
     }
 
@@ -225,7 +226,7 @@ def create_env_test(retarget=False, idx=1):
     return env, task_name, meta_data, baked_data, path, idx
 
 
-def bake_visual_demonstration_test(retarget=False, idx=1):
+def bake_visual_demonstration_test(retarget=False, idx=2):
     env, task_name, meta_data, baked_data, path, demo_idx = create_env_test(
         retarget=retarget, idx=idx)
 
@@ -248,9 +249,9 @@ def bake_visual_demonstration_test(retarget=False, idx=1):
         init_pose_aug_obj * meta_data["env_kwargs"]["init_obj_pos"]
     )
     env.manipulated_object.set_pose(meta_data["env_kwargs"]["init_obj_pos"])
-    # meta_data["env_kwargs"]["init_target_pos"] = sapien.Pose(
-    #     [0.0, 0.2, env.bowl_height]
-    # )
+    meta_data["env_kwargs"]["init_target_pos"] = sapien.Pose(
+        [0.0, 0.2, env.bowl_height]
+    )
     if task_name in ["pick_place", "pour"]:
         init_pose_aug_target = init_pose_aug_dict["init_pose_aug_target"]
         meta_data["env_kwargs"]["init_target_pos"] = (
@@ -285,13 +286,13 @@ def bake_visual_demonstration_test(retarget=False, idx=1):
             ]
         )
 
-    # # LIGHT AND TEXTURE RANDOMNESS
-    # env.random_map(2) ###hyper parameter
-    # ############## Add Texture Randomness ############
-    # env.generate_random_object_texture(2)
-    # ############## Add Light Randomness ############
-    # env.random_light(2)
-    # ############## Add Action Chunk ############
+    # LIGHT AND TEXTURE RANDOMNESS
+    env.random_map(2)  # hyper parameter
+    ############## Add Texture Randomness ############
+    env.generate_random_object_texture(2)
+    ############## Add Light Randomness ############
+    env.random_light(2)
+    ############## Add Action Chunk ############
     valid_frame = 0
     lifted_chunk = 0
     visual_baked = dict(obs=[], action=[])
@@ -394,7 +395,7 @@ def bake_visual_demonstration_test(retarget=False, idx=1):
         imageio.mimsave(
             f"./temp/demos/player/dclaw_{object_name}_{demo_idx:04d}.mp4",
             rgb_pics,
-            fps=180,
+            fps=60,
         )
 
 
@@ -730,7 +731,7 @@ if __name__ == "__main__":
     # bake_demonstration_svh_test()
     # bake_demonstration_ar10_test()
     # bake_demonstration_mano()
-    for i in range(1, 51):
-        bake_visual_demonstration_test(retarget=False, idx=i)
-    # bake_visual_demonstration_test()
+    # for i in range(1, 51):
+    #     bake_visual_demonstration_test(retarget=False, idx=i)
+    bake_visual_demonstration_test()
     # bake_visual_real_demonstration_test()

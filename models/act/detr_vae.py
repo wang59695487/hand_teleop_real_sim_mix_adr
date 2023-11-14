@@ -97,6 +97,8 @@ class DETRVAE(nn.Module):
             self.fea_pos_embed = nn.Embedding(1, hidden_dim)
             self.encoder_obs_proj = nn.Linear(
                 2048, hidden_dim)  # project obs to embedding
+            # self.encoder_obs_proj = nn.Linear(
+            #     768, hidden_dim)  # project obs to embedding for mvp
             self.is_feature = True
 
         # encoder extra parameters

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import numpy.random as random
+import time
 from numpy.linalg import norm
 from scipy.spatial.transform import Rotation as R
 
@@ -44,7 +45,7 @@ def get_engine_and_renderer(use_gui=True, use_ray_tracing=False, device="", mipm
             # _renderer = sapien.VulkanRenderer(default_mipmap_levels=mipmap_levels, offscreen_only=not use_gui,
             #                                   device=device, do_not_load_texture=no_rgb)
             _renderer = sapien.VulkanRenderer(default_mipmap_levels=mipmap_levels, offscreen_only=not use_gui,
-                                              device=device)                                              
+                                              device=device)
             _engine.set_renderer(_renderer)
             if no_rgb:
                 print(f"Use trivial renderer without color.")
@@ -96,7 +97,8 @@ def add_default_scene_light(scene: sapien.Scene, renderer: sapien.VulkanRenderer
     # asset_dir = Path(__file__).parent.parent.parent.parent / "assets"
     # ktx_path = asset_dir / "misc" / "ktx" / "day.ktx"
     # scene.set_environment_map(str(ktx_path))
-    scene.add_directional_light(np.array([-1, -1, -1]), np.array([0.5, 0.5, 0.5]), shadow=cast_shadow)
+    scene.add_directional_light(
+        np.array([-1, -1, -1]), np.array([0.5, 0.5, 0.5]), shadow=cast_shadow)
     scene.add_directional_light([0, 0, -1], [0.9, 0.8, 0.8], shadow=False)
     scene.add_spot_light(np.array([0, 0, 1.5]), direction=np.array([0, 0, -1]), inner_fov=0.3, outer_fov=1.0,
                          color=np.array([0.5, 0.5, 0.5]), shadow=False)
@@ -107,17 +109,19 @@ def add_default_scene_light(scene: sapien.Scene, renderer: sapien.VulkanRenderer
     visual_material.set_metallic(1)
     visual_material.set_specular(0.04)
     if add_ground:
-        scene.add_ground(-1, render_material=visual_material, render_half_size=np.array([50,50]))
+        scene.add_ground(-1, render_material=visual_material,
+                         render_half_size=np.array([50, 50]))
 
-def generate_direction_in_scale(randomness_scale=1,num=1):
+
+def generate_direction_in_scale(randomness_scale=1, num=1):
     r_limited = 0.5 + randomness_scale * 0.1
     directions = []
     # Limited the direction in a certain scale
     for i in range(num):
         while True:
             direction = R.random().as_euler('xyz', degrees=False)
-            #normalize direction
-            direction = direction/norm(direction,2)
+            # normalize direction
+            direction = direction/norm(direction, 2)
             r = np.sqrt(1-direction[2]**2)
             if r < r_limited:
                 if direction[2] > 0:
@@ -126,27 +130,34 @@ def generate_direction_in_scale(randomness_scale=1,num=1):
                 break
     return directions
 
-def random_environment_map(scene: sapien.Scene, randomness_scale = 1):
-    var = randomness_scale * 0.1
-    scene.set_environment_map(create_dome_envmap(filename='/tmp/sapien_dome.ktx', sky_color=random.uniform(0.5-var, 0.5+var ,size=3), ground_color=random.uniform(0.2-var, 0.2+var,size=3), blend=0.3, resolution=256))
 
-def random_scene_light(scene: sapien.Scene, renderer: sapien.VulkanRenderer, randomness_scale = 1, add_ground=True, cast_shadow=True):
+def random_environment_map(scene: sapien.Scene, randomness_scale=1):
+    random.seed(int(time.time()))
+    var = randomness_scale * 0.1
+    scene.set_environment_map(create_dome_envmap(filename='/tmp/sapien_dome.ktx', sky_color=random.uniform(
+        0.5-var, 0.5+var, size=3), ground_color=random.uniform(0.2-var, 0.2+var, size=3), blend=0.3, resolution=256))
+
+
+def random_scene_light(scene: sapien.Scene, renderer: sapien.VulkanRenderer, randomness_scale=1, add_ground=True, cast_shadow=True):
+    random.seed(int(time.time()))
     # If the light is already set, then we just skip the function.
     var = randomness_scale * 0.1
 
     for light in scene.get_all_lights():
-        light.set_direction(generate_direction_in_scale(randomness_scale=randomness_scale)[0])
+        light.set_direction(generate_direction_in_scale(
+            randomness_scale=randomness_scale)[0])
         # print(light.color)
         colors = []
         for color in light.color:
             color = random.uniform(color-var, color+var)
             colors.append(color)
         light.set_color(colors)
-    
+
     visual_material = renderer.create_material()
     visual_material.set_base_color(np.array([0.5, 0.5, 0.5, 1]))
     visual_material.set_roughness(0.7)
     visual_material.set_metallic(1)
     visual_material.set_specular(0.04)
     if add_ground:
-        scene.add_ground(-1, render_material=visual_material, render_half_size=np.array([50,50]))
+        scene.add_ground(-1, render_material=visual_material,
+                         render_half_size=np.array([50, 50]))

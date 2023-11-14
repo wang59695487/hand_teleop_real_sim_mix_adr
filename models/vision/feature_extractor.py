@@ -207,7 +207,7 @@ def generate_feature_extraction_model(backbone_type):
 
     elif "pvr" in backbone_type:
         backbone = models.resnet50()
-        checkpoint = torch.load('/home/junwang/project/any_teleop_internal/real_robot/trained_models/moco_aug.pth.tar')
+        checkpoint = torch.load('./trained_models/moco_aug.pth.tar')
         state_dict = checkpoint['state_dict']
         for k in list(state_dict.keys()):
             # retain only encoder_q up to before the embedding layer
