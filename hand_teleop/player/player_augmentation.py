@@ -136,7 +136,7 @@ def create_env(args, demo, retarget=False):
     env.reset()
 
     real_camera_cfg = {"relocate_view": dict(
-        pose=lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(640, 480))}
+        pose=lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(224, 224))}
     env.setup_camera_from_config(real_camera_cfg)
 
     # Specify modality
