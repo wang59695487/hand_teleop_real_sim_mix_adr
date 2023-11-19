@@ -83,7 +83,7 @@ def create_env(args, demo, retarget=False):
         env_params['init_obj_pos'] = meta_data["env_kwargs"]['init_obj_pos']
     if 'init_target_pos' in meta_data["env_kwargs"].keys():
         env_params['init_target_pos'] = meta_data["env_kwargs"]['init_target_pos']
-    if task_name == 'pick_place':
+    if 'pick_place' in task_name:
         if args['object_name'] == 'diverse_objects':
             bottle_id = np.random.randint(0, 10)
             if bottle_id == 9:
@@ -93,13 +93,13 @@ def create_env(args, demo, retarget=False):
                 env_params["object_category"] = "SHAPE_NET"
                 env_params["object_name"] = "bottle_{}".format(bottle_id)
         env = PickPlaceRLEnv(**env_params)
-    elif task_name == 'dclaw':
+    elif 'dclaw' in task_name:
         if args['object_name'] == 'diverse_objects':
             dclaw_id = np.random.randint(0, 8)
             env_params["object_name"] = dclaw_diverse_objects[dclaw_id]
 
         env = DClawRLEnv(**env_params)
-    elif task_name == 'pour':
+    elif 'pour' in task_name:
         env = PourBoxRLEnv(**env_params)
         meta_data["env_kwargs"]["init_target_pos"] = env.target_pose
     else:
@@ -155,13 +155,13 @@ def create_env(args, demo, retarget=False):
     env.setup_visual_obs_config(camera_info)
 
     # Player
-    if task_name == 'pick_place':
+    if 'pick_place' in task_name:
         player = PickPlaceEnvPlayer(
             meta_data, data, env, zero_joint_pos=env_params["zero_joint_pos"])
-    elif task_name == 'dclaw':
+    elif 'dclaw' in task_name:
         player = DcLawEnvPlayer(meta_data, data, env,
                                 zero_joint_pos=env_params["zero_joint_pos"])
-    elif task_name == 'pour':
+    elif 'pour' in task_name:
         player = PourEnvPlayer(meta_data, data, env,
                                zero_joint_pos=env_params["zero_joint_pos"])
     else:
@@ -231,20 +231,20 @@ def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_target, in
         aug_target = np.array([init_pose_aug_obj.p[0], init_pose_aug_obj.p[1]])
         one_step_aug_target = np.array([(-1*init_pose_aug_obj.p[0]+init_pose_aug_target.p[0]) /
                                        aug_step_target, (-1*init_pose_aug_obj.p[1]+init_pose_aug_target.p[1])/aug_step_target])
-    elif task_name == 'dclaw':
+    elif 'dclaw' in task_name:
         aug_step_obj = 100
 
     meta_data["env_kwargs"]['init_obj_pos'] = init_pose_aug_obj * \
         meta_data["env_kwargs"]['init_obj_pos']
     env.manipulated_object.set_pose(meta_data["env_kwargs"]['init_obj_pos'])
-    if task_name == 'pour':
+    if 'pour' in task_name:
         for i in range(len(env.boxes)):
             env.boxes[i].set_pose(meta_data["env_kwargs"]['init_obj_pos'])
 
     ################# Avoid the case that the object is already close to the target or there is no chunk for augmentation################
     if (task_name in ["pick_place", "pour"] and env._is_close_to_target()):
         return visual_baked, meta_data, False
-    elif task_name == 'dclaw':
+    elif 'dclaw' in task_name:
         env.object_total_rotate_angle = 0
         env.object_angle = env.get_object_rotate_angle()
 

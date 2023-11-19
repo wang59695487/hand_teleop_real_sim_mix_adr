@@ -49,8 +49,8 @@ def aug_in_adr(args, current_rank, demo_files):
 
         print("Replaying the sim demos and augmenting the dataset:")
         print("---------------------")
-        # aug = {2: 5, 3: 10, 4: 15, 5: 300}
-        aug = {2: 10, 3: 20, 4: 30, 5: 500}
+        aug = {2: 5, 3: 10, 4: 15, 5: 300}
+        # aug = {2: 10, 3: 20, 4: 30, 5: 500}
         ########### Add new sim demos to the original dataset ###########
         file1 = h5py.File(f"{args['sim_aug_dataset_folder']}/dataset.h5", "a")
         for i in range(400):
@@ -58,12 +58,18 @@ def aug_in_adr(args, current_rank, demo_files):
             for _, file_name in enumerate(demo_files):
                 print(file_name)
                 demo_idx = file_name.split("/")[-1].split(".")[0]
-                if args["task_name"] in ["pick_place", "pour"]:
+                if "dclaw" in args["task_name"]:
+                    var_obj = var_adr_object if current_rank >= 3 else 0
+                    x1 = np.random.uniform(-var_obj / 2, var_obj / 4)
+                    y1 = np.random.uniform(-var_obj, var_obj)
+                    init_pose_aug_obj = sapien.Pose([x1, y1, 0], [1, 0, 0, 0])
+                    init_pose_aug_target = None
+                else:
                     var_obj = var_adr_object if current_rank >= 4 else 0
-                    if args["task_name"] == "pick_place":
+                    if "pick_place" in args["task_name"]:
                         x1, y1 = np.random.uniform(-0.02 -
                                                    var_obj, 0.02 + var_obj, 2)
-                    elif args["task_name"] == "pour":
+                    elif "pour" in args["task_name"]:
                         x1 = np.random.uniform(-0.02, 0.04 + var_obj)
                         y1 = np.random.uniform(-0.04 - var_obj, 0.02)
                     if np.fabs(x1) <= 0.01 and np.fabs(y1) <= 0.01:
@@ -71,11 +77,11 @@ def aug_in_adr(args, current_rank, demo_files):
                     init_pose_aug_obj = sapien.Pose([x1, y1, 0], [1, 0, 0, 0])
 
                     var_target = var_adr_target if current_rank >= 3 else 0
-                    if args["task_name"] == "pick_place":
+                    if "pick_place" in args["task_name"]:
                         x2 = np.random.uniform(-0.02 -
                                                var_target, 0.02 + var_target)
                         y2 = np.random.uniform(-0.02 - var_target * 2, 0.02)
-                    elif args["task_name"] == "pour":
+                    elif "pour" in args["task_name"]:
                         x2 = np.random.uniform(-0.02 -
                                                var_target, 0.02 + var_target)
                         y2 = np.random.uniform(0, 0.02 + var_target)
@@ -83,13 +89,6 @@ def aug_in_adr(args, current_rank, demo_files):
                         continue
                     init_pose_aug_target = sapien.Pose(
                         [x2, y2, 0], [1, 0, 0, 0])
-
-                elif args["task_name"] == "dclaw":
-                    var_obj = var_adr_object if current_rank >= 3 else 0
-                    x1 = np.random.uniform(-var_obj / 2, var_obj / 4)
-                    y1 = np.random.uniform(-var_obj, var_obj)
-                    init_pose_aug_obj = sapien.Pose([x1, y1, 0], [1, 0, 0, 0])
-                    init_pose_aug_target = None
 
                 with open(file_name, "rb") as file:
                     demo = pickle.load(file)
@@ -171,7 +170,7 @@ def adr(args, current_rank, adr_dict):
                 adr_dict["var_adr_light"] = 2.6
                 current_rank += 1
 
-        elif current_rank == 3 and args["task_name"] in ["pick_place", "pour"]:
+        elif current_rank == 3 and args["task_name"] in ["pick_place", "pour", "pick_place_multi_view"]:
             adr_dict["var_adr_target"] = (
                 adr_dict["var_adr_target"] + 0.025
                 if adr_dict["is_var_adr"]
@@ -181,7 +180,7 @@ def adr(args, current_rank, adr_dict):
                 adr_dict["var_adr_target"] = 0.16
                 current_rank += 1
 
-        elif current_rank == 4 and args["task_name"] in ["pick_place", "pour"]:
+        elif current_rank == 4 and args["task_name"] in ["pick_place", "pour", "pick_place_multi_view"]:
             adr_dict["var_adr_object"] = (
                 adr_dict["var_adr_object"] + 0.025
                 if adr_dict["is_var_adr"]

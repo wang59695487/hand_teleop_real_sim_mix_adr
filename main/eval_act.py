@@ -68,14 +68,11 @@ def create_env(args):
         print("Found initial object pose")
         env_params["init_obj_pos"] = meta_data["env_kwargs"]["init_obj_pos"]
 
-    if "init_target_pos" in meta_data["env_kwargs"].keys() and task_name in [
-        "pick_place",
-        "pour",
-    ]:
+    if "init_target_pos" in meta_data["env_kwargs"].keys() and "dclaw" not in task_name:
         print("Found initial target pose")
         env_params["init_target_pos"] = meta_data["env_kwargs"]["init_target_pos"]
 
-    if task_name == "pick_place":
+    if "pick_place" in task_name:
         if args['object_name'] == 'diverse_objects':
             bottle_id = np.random.randint(0, 10)
             if bottle_id == 9:
@@ -85,12 +82,12 @@ def create_env(args):
                 env_params["object_category"] = "SHAPE_NET"
                 env_params["object_name"] = "bottle_{}".format(bottle_id)
         env = PickPlaceRLEnv(**env_params)
-    elif task_name == "dclaw":
+    elif "dclaw" in task_name:
         if args['object_name'] == 'diverse_objects':
             dclaw_id = np.random.randint(0, 8)
             env_params["object_name"] = dclaw_diverse_objects[dclaw_id]
         env = DClawRLEnv(**env_params)
-    elif task_name == "pour":
+    elif "pour" in task_name:
         env = PourBoxRLEnv(**env_params)
     else:
         raise NotImplementedError
@@ -226,7 +223,7 @@ def eval_in_env(
     ########### Initialize the Robot Qpose ############
     task_name = meta_data["task_name"]
 
-    if task_name == "dclaw":
+    if "dclaw" in task_name:
         init_robot_qpos = [
             0,
             (20 / 180) * np.pi,
@@ -258,12 +255,15 @@ def eval_in_env(
     print("Object Pos: {}".format(object_pos))
 
     env.manipulated_object.set_pose(object_pos)
-    if task_name == "pour":
+    if "pour" in task_name:
         for i in range(len(env.boxes)):
             env.boxes[i].set_pose(object_pos)
 
     ########### Add target-object Randomness ############
-    if task_name in ["pick_place", "pour"]:
+    if "dclaw" in task_name:
+        env.object_total_rotate_angle = 0
+        env.object_angle = env.get_object_rotate_angle()
+    else:
         if randomness_rank > 2:
             ########### Randomize the target-object  ############
             var_target = [0.08, 0.2] if randomness_rank < 4 else [0.16, 0.2]
@@ -272,11 +272,11 @@ def eval_in_env(
             )
             x2 = np.random.uniform(-var_target[0], var_target[0])
             y2 = np.random.uniform(0, var_target[1])
-            if task_name == "pick_place":
+            if "pick_place" in task_name:
                 aug_random_target = sapien.Pose(
                     [-0.005 + x2, -0.1 - y2, 0], [1, 0, 0, 0]
                 )
-            elif task_name == "pour":
+            elif "pour" in task_name:
                 aug_random_target = sapien.Pose(
                     [0 + x2, 0.2 + y2, env.bowl_height], [1, 0, 0, 0]
                 )
@@ -285,22 +285,22 @@ def eval_in_env(
             if dist_xy >= 0.25:
                 env.target_object.set_pose(aug_random_target)
             else:
-                if task_name == "pick_place":
+                if "pick_place" in task_name:
                     env.target_object.set_pose(
                         sapien.Pose([-0.005, -0.12, 0], [1, 0, 0, 0])
                     )
-                elif task_name == "pour":
+                elif "pour" in task_name:
                     env.target_object.set_pose(
                         sapien.Pose([0, 0.2, env.bowl_height], [1, 0, 0, 0])
                     )
 
             print("Target Pos: {}".format(aug_random_target))
         else:
-            if task_name == "pick_place":
+            if "pick_place" in task_name:
                 env.target_object.set_pose(
                     sapien.Pose([-0.005, -0.12, 0], [1, 0, 0, 0])
                 )
-            elif task_name == "pour":
+            elif "pour" in task_name:
                 env.target_object.set_pose(
                     sapien.Pose([0, 0.2, env.bowl_height], [1, 0, 0, 0])
                 )
@@ -308,9 +308,7 @@ def eval_in_env(
         for _ in range(10 * env.frame_skip):
             env.scene.step()
 
-    elif task_name == "dclaw":
-        env.object_total_rotate_angle = 0
-        env.object_angle = env.get_object_rotate_angle()
+
 
     obs = env.get_observation()
     success = False
@@ -368,19 +366,19 @@ def eval_in_env(
 
     # only save video if success or in the final_success evaluation
     # if success or epoch == "best":
-    if task_name == "pick_place":
+    if "pick_place" in task_name:
         is_lifted = info["is_object_lifted"]
         video_path = os.path.join(
             log_dir,
             f"epoch_{epoch}_{eval_idx}_rank{randomness_rank}_{success}_{is_lifted}.mp4",
         )
-    elif task_name == "pour":
+    elif "pour" in task_name:
         num_in_bowl = info["num_box_in_bowl"]
         video_path = os.path.join(
             log_dir,
             f"epoch_{epoch}_{eval_idx}_rank{randomness_rank}_{success}_{num_in_bowl}.mp4",
         )
-    elif task_name == "dclaw":
+    elif "dclaw" in task_name:
         total_angle = info["object_total_rotate_angle"]
         video_path = os.path.join(
             log_dir,

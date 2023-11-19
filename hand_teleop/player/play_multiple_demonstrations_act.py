@@ -205,11 +205,11 @@ def play_one_real_sim_visual_demo(
         print("Found initial target pose")
         env_params["init_target_pos"] = meta_data["env_kwargs"]["init_target_pos"]
 
-    if task_name == "pick_place":
+    if "pick_place" in task_name:
         env = PickPlaceRLEnv(**env_params)
-    elif task_name == "dclaw":
+    elif "dclaw" in task_name:
         env = DClawRLEnv(**env_params)
-    elif task_name == "pour":
+    elif "pour" in task_name:
         env = PourBoxRLEnv(**env_params)
         meta_data["env_kwargs"]["init_target_pos"] = env.target_pose
     else:
@@ -273,15 +273,15 @@ def play_one_real_sim_visual_demo(
     env.setup_visual_obs_config(camera_info)
 
     # Player
-    if task_name == "pick_place":
+    if "pick_place" in task_name:
         player = PickPlaceEnvPlayer(
             meta_data, data, env, zero_joint_pos=env_params["zero_joint_pos"]
         )
-    elif task_name == "dclaw":
+    elif "dclaw" in task_name:
         player = DcLawEnvPlayer(
             meta_data, data, env, zero_joint_pos=env_params["zero_joint_pos"]
         )
-    elif task_name == "pour":
+    elif "pour" in task_name:
         player = PourEnvPlayer(
             meta_data, data, env, zero_joint_pos=env_params["zero_joint_pos"]
         )

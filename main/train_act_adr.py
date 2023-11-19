@@ -179,7 +179,7 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
                             )
                             y = np.linspace(
                                 0.2 - var_object[1], 0.3 + var_object[0], 4)
-                        elif args["task_name"] == "pour":
+                        elif "pour" in args["task_name"]:
                             var_object = [0, 0] if rank < 4 else [0.02, 0.08]
                             x = np.linspace(
                                 -0.08, 0.12 + var_object[0], 5
@@ -232,7 +232,7 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
             metrics["var_adr_light"] = adr_dict["var_adr_light"]
             metrics["var_adr_object"] = adr_dict["var_adr_object"]
 
-            if args["task_name"] in ["pick_place", "pour"]:
+            if args["task_name"] in ["pick_place", "pour", "pick_place_multi_view"]:
                 metrics["var_adr_target"] = adr_dict["var_adr_target"]
 
         wandb.log(metrics)
