@@ -50,10 +50,10 @@ def create_env_test(retarget=False, idx=2):
     # Recorder
     # shutil.rmtree('./temp/demos/player', ignore_errors=True)
     # os.makedirs('./temp/demos/player')
-    # path = f"./sim/raw_data/pick_place_mustard_bottle/mustard_bottle_{idx:004d}.pickle"
+    path = f"./sim/raw_data/pick_place_mustard_bottle/mustard_bottle_{idx:004d}.pickle"
     # path = f"./sim/raw_data/dclaw/dclaw_3x_{idx:004d}.pickle"
     # path = f"./sim/raw_data/pick_place/bottle_1_{idx:004d}.pickle"
-    path = f"./sim/raw_data/pour/chip_can_{idx:004d}.pickle"
+    # path = f"./sim/raw_data/pour/chip_can_{idx:004d}.pickle"
     all_data = np.load(path, allow_pickle=True)
     meta_data = all_data["meta_data"]
     task_name = meta_data["env_kwargs"]["task_name"]
@@ -80,11 +80,11 @@ def create_env_test(retarget=False, idx=2):
     env_params = meta_data["env_kwargs"]
     env_params["robot_name"] = robot_name
     env_params["use_visual_obs"] = use_visual_obs
-    env_params["use_gui"] = False
+    env_params["use_gui"] = True
     # env_params["object_name"] = "sugar_box"
     # env_params["object_name"] = "bleach_cleanser"
-    # env_params["object_category"] = "SHAPE_NET"
-    # env_params["object_name"] = "bottle_8"
+    env_params["object_category"] = "SHAPE_NET"
+    env_params["object_name"] = "bottle_5"
 
     # env_params["object_name"] = "dclaw_3x_135"
     # env_params["object_name"] = "dclaw_4x_60"
@@ -148,14 +148,17 @@ def create_env_test(retarget=False, idx=2):
             env.rl_step = env.simple_sim_step
 
     env.reset()
-    # viewer = env.render()
-    # env.viewer = viewer
-    # viewer.set_camera_xyz(-0.6, 0.6, 0.6)
-    # viewer.set_camera_rpy(0, -np.pi / 6, np.pi / 4)
-
+    viewer = env.render()
+    env.viewer = viewer
+    viewer.set_camera_xyz(-0.6, 0.6, 0.6)
+    viewer.set_camera_rpy(0, -np.pi / 6, np.pi / 4)
+    # 0 , -15-15, -45-45
+    # quat = transforms3d.euler.euler2quat(
+    #     0, np.deg2rad(-15), np.deg2rad(-15))
+    # aug_view_pose = sapien.Pose([0.05, 0.05, 0], quat)
     real_camera_cfg = {
         "relocate_view": dict(
-            pose=lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(640, 480)
+            pose=aug_view_pose*lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(640, 480)
         )
     }
 
@@ -237,21 +240,27 @@ def bake_visual_demonstration_test(retarget=False, idx=2):
     frame_skip = 1
     rgb_pics = []
 
-    ################################# Kinematic Augmentation####################################
+    ################################ Kinematic Augmentation####################################
     init_pose_aug_dict = {
-        "init_pose_aug_obj": sapien.Pose([0, 0, 0], [1, 0, 0, 0]),
-        "init_pose_aug_target": sapien.Pose([0, 0, 0], [1, 0, 0, 0]),
+        "init_pose_aug_obj": sapien.Pose([0.15, 0.1, 0], [1, 0, 0, 0]),
+        "init_pose_aug_target": sapien.Pose([0.1, -0.1, 0], [1, 0, 0, 0]),
     }
+    # init_pose_aug_dict = {
+    #     "init_pose_aug_obj": sapien.Pose([0, 0, 0], [1, 0, 0, 0]),
+    #     "init_pose_aug_target": sapien.Pose([0, 0, 0], [1, 0, 0, 0]),
+    # }
 
-    aug_step_target = 400
+    aug_step_target = 250
     init_pose_aug_obj = init_pose_aug_dict["init_pose_aug_obj"]
     meta_data["env_kwargs"]["init_obj_pos"] = (
         init_pose_aug_obj * meta_data["env_kwargs"]["init_obj_pos"]
     )
     env.manipulated_object.set_pose(meta_data["env_kwargs"]["init_obj_pos"])
-    meta_data["env_kwargs"]["init_target_pos"] = sapien.Pose(
-        [0.0, 0.2, env.bowl_height]
-    )
+    if task_name == 'pour':
+        meta_data["env_kwargs"]["init_target_pos"] = sapien.Pose(
+            [0.0, 0.2, env.bowl_height])
+        for i in range(len(env.boxes)):
+            env.boxes[i].set_pose(meta_data["env_kwargs"]['init_obj_pos'])
     if task_name in ["pick_place", "pour"]:
         init_pose_aug_target = init_pose_aug_dict["init_pose_aug_target"]
         meta_data["env_kwargs"]["init_target_pos"] = (
@@ -267,17 +276,17 @@ def bake_visual_demonstration_test(retarget=False, idx=2):
                 / aug_step_target,
             ]
         )
-        aug_step_obj = 500
+        aug_step_obj = 100
         aug_obj = np.array([0, 0])
         one_step_aug_obj = np.array(
             [
                 init_pose_aug_obj.p[0] / aug_step_obj,
-                init_pose_aug_obj.p[0] / aug_step_obj,
+                init_pose_aug_obj.p[1] / aug_step_obj,
             ]
         )
 
     elif task_name == "dclaw":
-        aug_step_obj = 50
+        aug_step_obj = 100
         aug_obj = np.array([0, 0])
         one_step_aug_obj = np.array(
             [
@@ -292,10 +301,14 @@ def bake_visual_demonstration_test(retarget=False, idx=2):
     env.generate_random_object_texture(2)
     ############## Add Light Randomness ############
     env.random_light(2)
-    ############## Add Action Chunk ############
+
     valid_frame = 0
     lifted_chunk = 0
     visual_baked = dict(obs=[], action=[])
+    print(env.cameras)
+    env.scene.update_render()
+    env.viewer.cameras.append(env.cameras["relocate_view"])
+    env.viewer.focus_camera(env.cameras["relocate_view"])
     for idx in range(0, len(baked_data["obs"]), frame_skip):
         # NOTE: robot.get_qpos() version
         if idx < len(baked_data["obs"]) - frame_skip:
@@ -377,7 +390,7 @@ def bake_visual_demonstration_test(retarget=False, idx=2):
                     np.concatenate([delta_pose * 100, hand_qpos])
                 )
                 _, _, _, info = env.step(target_qpos)
-                # env.render()
+                env.render()
                 # print(valid_frame)
                 # print(info["object_total_rotate_angle"])
                 rgb = env.get_observation(
@@ -389,14 +402,14 @@ def bake_visual_demonstration_test(retarget=False, idx=2):
     all_data["meta_data"] = meta_data
     all_data["meta_data"]["env_kwargs"]["task_name"] = task_name
 
-    if info["success"]:
-        with open(f"./sim/raw_data/dclaw_diverse/{object_name}_{demo_idx:04d}.pickle", "wb") as f:
-            pickle.dump(all_data, f)
-        imageio.mimsave(
-            f"./temp/demos/player/dclaw_{object_name}_{demo_idx:04d}.mp4",
-            rgb_pics,
-            fps=60,
-        )
+    # if info["success"]:
+    #     with open(f"./sim/raw_data/dclaw_diverse/{object_name}_{demo_idx:04d}.pickle", "wb") as f:
+    #         pickle.dump(all_data, f)
+    #     imageio.mimsave(
+    #         f"./temp/demos/player/dclaw_{object_name}_{demo_idx:04d}.mp4",
+    #         rgb_pics,
+    #         fps=60,
+    #     )
 
 
 def bake_visual_real_demonstration_test(retarget=False):
@@ -513,7 +526,7 @@ def bake_visual_real_demonstration_test(retarget=False):
 
     real_camera_cfg = {
         "relocate_view": dict(
-            pose=lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(640, 480)
+            pose=lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(2048, 2048)
         )
     }
 
@@ -650,6 +663,7 @@ def bake_visual_real_demonstration_test(retarget=False):
 
     frame_skip = 1
     rgb_pics = []
+
     for idx in range(0, len(baked_data), frame_skip):
         # NOTE: robot.get_qpos() version
         if idx < len(baked_data) - frame_skip:

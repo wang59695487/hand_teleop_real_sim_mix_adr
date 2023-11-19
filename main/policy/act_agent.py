@@ -248,20 +248,32 @@ class ActAgent(object):
         # for name, param in self.policy.model.named_parameters():
         #     param.requires_grad = False
 
-        # for param in self.policy.model.encoder.parameters():
-        #     if param.dim() > 1:
-        #         #nn.init.xavier_uniform_(param)
-        #         param.requires_grad = True
+        # # for param in self.policy.model.encoder.parameters():
+        # #     if param.dim() > 1:
+        # #         # nn.init.xavier_uniform_(param)
+        # #         param.requires_grad = True
 
         # for param in self.policy.model.backbones.parameters():
         #     if param.dim() > 1:
-        #         #nn.init.xavier_uniform_(param)
+        #         # nn.init.xavier_uniform_(param)
         #         param.requires_grad = True
 
         # for name, param in self.policy.model.named_parameters():
-        #     if "encoder_obs" in name:
+        #     if "transformer.encoder.layers.3" in name:
         #         if param.dim() > 1:
-        #             #nn.init.xavier_uniform_(param)
+        #             # nn.init.xavier_uniform_(param)
+        #             param.requires_grad = True
+        #     elif "transformer.decoder.layers.5" in name:
+        #         if param.dim() > 1:
+        #             # nn.init.xavier_uniform_(param)
+        #             param.requires_grad = True
+        #     elif "transformer.decoder.layers.6" in name:
+        #         if param.dim() > 1:
+        #             # nn.init.xavier_uniform_(param)
+        #             param.requires_grad = True
+        #     elif "encoder.layers.3" in name:
+        #         if param.dim() > 1:
+        #             # nn.init.xavier_uniform_(param)
         #             param.requires_grad = True
 
         ############## Initialize optimizer and BatchNorm##################

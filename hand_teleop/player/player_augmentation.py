@@ -133,8 +133,19 @@ def create_env(args, demo, retarget=False):
 
     env.reset()
 
-    real_camera_cfg = {"relocate_view": dict(
-        pose=lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(640, 480))}
+    if "multi_view" in args['task_name']:
+        ry = random.uniform(-15, 15)
+        rz = random.uniform(-15, 15)
+        quat = transforms3d.euler.euler2quat(
+            0, np.deg2rad(ry), np.deg2rad(rz))
+        aug_view_pose = sapien.Pose([0.05, 0.05, 0], quat)
+    else:
+        aug_view_pose = sapien.Pose([0, 0, 0], [1, 0, 0, 0])
+    real_camera_cfg = {
+        "relocate_view": dict(
+            pose=aug_view_pose*lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(224, 224)
+        )
+    }
     env.setup_camera_from_config(real_camera_cfg)
 
     # Specify modality
@@ -263,10 +274,10 @@ def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_target, in
         aug_obj = aug_obj + one_step_aug_obj
         palm_next_pose = sapien.Pose([aug_obj[0], aug_obj[1], 0], [
             1, 0, 0, 0])*sapien.Pose(ee_pose_next[0:3], ee_pose_next[3:7])
-        ########### Add Light Randomness ############
-        # if args['randomness_rank'] >= 2 and i % 50 == 0:
-        #     env.random_light(var_adr_light)
-        #     env.generate_random_object_texture(var_adr_light)
+        ########## Add Light Randomness ############
+        if args['randomness_rank'] >= 2 and i % 50 == 0:
+            env.random_light(var_adr_light)
+            env.generate_random_object_texture(var_adr_light)
 
         palm_next_pose = robot_pose.inv() * palm_next_pose
         palm_delta_pose = palm_pose.inv() * palm_next_pose
@@ -346,10 +357,10 @@ def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_target, in
                     palm_next_pose = sapien.Pose([aug_obj[0], aug_obj[1], 0], [
                                                  1, 0, 0, 0])*sapien.Pose(ee_pose_next[0:3], ee_pose_next[3:7])
 
-                # ########### Add Light Randomness ############
-                # if args['randomness_rank'] >= 2 and valid_frame % 50 == 0:
-                #     env.random_light(var_adr_light)
-                #     env.generate_random_object_texture(var_adr_light)
+                ########### Add Light Randomness ############
+                if args['randomness_rank'] >= 2 and valid_frame % 50 == 0:
+                    env.random_light(var_adr_light)
+                    env.generate_random_object_texture(var_adr_light)
 
                 palm_next_pose = robot_pose.inv() * palm_next_pose
                 palm_delta_pose = palm_pose.inv() * palm_next_pose
@@ -458,8 +469,8 @@ def player_augmenting(args):
                 print("##########This is {}th try and {}th success##########".format(
                     i+1, num_test))
 
-                imageio.mimsave(
-                    f"./temp/demos/aug_{args['object_name']}/demo_{demo_id+1}_{num_test}_x1{x1:.2f}_y1{y1:.2f}_x2{x2:.2f}_y2{y2:.2f}.mp4", video, fps=120)
+                # imageio.mimsave(
+                #     f"./temp/demos/aug_{args['object_name']}/demo_{demo_id+1}_{num_test}_x1{x1:.2f}_y1{y1:.2f}_x2{x2:.2f}_y2{y2:.2f}.mp4", video, fps=120)
 
             if num_test == args['kinematic_aug']:
                 break

@@ -3,6 +3,7 @@ import torch
 import os
 import pickle
 import h5py
+import random
 from copy import deepcopy
 
 import multiprocessing as mp
@@ -13,12 +14,8 @@ from typing import Callable, List, Tuple
 import sapien.core as sapien
 import tqdm
 
-from hand_teleop.env.rl_env.pick_place_env import PickPlaceRLEnv
-from hand_teleop.env.rl_env.dclaw_env import DClawRLEnv
-
 from hand_teleop.player.randomization_utils import *
 from hand_teleop.player.player import *
-from hand_teleop.real_world import lab
 
 
 def apply_IK_get_real_action(action, env, qpos):
@@ -133,9 +130,18 @@ def create_env(args):
         env.rl_step = env.simple_sim_step
 
     if args["use_visual_obs"]:
+
+        if "multi_view" in args['task_name']:
+            ry = random.uniform(-15, 15)
+            rz = random.uniform(-15, 15)
+            quat = transforms3d.euler.euler2quat(
+                0, np.deg2rad(ry), np.deg2rad(rz))
+            aug_view_pose = sapien.Pose([0.05, 0.05, 0], quat)
+        else:
+            aug_view_pose = sapien.Pose([0, 0, 0], [1, 0, 0, 0])
         real_camera_cfg = {
             "relocate_view": dict(
-                pose=lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(224, 224)
+                pose=aug_view_pose*lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(224, 224)
             )
         }
 
@@ -298,10 +304,10 @@ def eval_in_env(
                 env.target_object.set_pose(
                     sapien.Pose([0, 0.2, env.bowl_height], [1, 0, 0, 0])
                 )
-        
+
         for _ in range(10 * env.frame_skip):
             env.scene.step()
-    
+
     elif task_name == "dclaw":
         env.object_total_rotate_angle = 0
         env.object_angle = env.get_object_rotate_angle()
