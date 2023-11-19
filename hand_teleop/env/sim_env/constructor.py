@@ -104,7 +104,7 @@ def add_default_scene_light(scene: sapien.Scene, renderer: sapien.VulkanRenderer
                          color=np.array([0.5, 0.5, 0.5]), shadow=False)
 
     visual_material = renderer.create_material()
-    visual_material.set_base_color(np.array([0.5, 0.5, 0.5, 1]))
+    visual_material.set_base_color(np.array([0, 0, 0, 0.5]))
     visual_material.set_roughness(0.7)
     visual_material.set_metallic(1)
     visual_material.set_specular(0.04)
@@ -150,12 +150,3 @@ def random_scene_light(scene: sapien.Scene, renderer: sapien.VulkanRenderer, ran
             color = random.uniform(color-var, color+var)
             colors.append(color)
         light.set_color(colors)
-
-    visual_material = renderer.create_material()
-    visual_material.set_base_color(np.array([0.5, 0.5, 0.5, 1]))
-    visual_material.set_roughness(0.7)
-    visual_material.set_metallic(1)
-    visual_material.set_specular(0.04)
-    if add_ground:
-        scene.add_ground(-1, render_material=visual_material,
-                         render_half_size=np.array([50, 50]))
