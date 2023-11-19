@@ -10,9 +10,6 @@ import torchvision
 import torchvision.transforms as T
 from torchvision.transforms import v2
 
-from hand_teleop.env.rl_env.pick_place_env import PickPlaceRLEnv
-from hand_teleop.env.rl_env.dclaw_env import DClawRLEnv
-from hand_teleop.env.rl_env.pour_env import PourBoxRLEnv
 from hand_teleop.player.player import *
 from hand_teleop.player.randomization_utils import *
 from hand_teleop.real_world import lab
@@ -456,7 +453,7 @@ def play_one_real_sim_visual_demo(
 
                 if (
                     ee_pose_delta <= args["sim_delta_ee_pose_bound"]
-                    and np.mean(handqpos2angle(delta_hand_qpos)) <= 1.2 and task_name in ["dclaw"]
+                    and np.mean(handqpos2angle(delta_hand_qpos)) <= 1.2
                 ):
                     continue
                 else:

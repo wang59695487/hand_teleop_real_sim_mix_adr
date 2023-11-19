@@ -155,8 +155,24 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
                 eval_player.eval_init()
                 avg_success = 0
                 for rank in range(1, args["randomness_rank"] + 1):
-                    if args["task_name"] in ["pick_place", "pour"]:
-                        if args["task_name"] == "pick_place":
+                    if "dclaw" in args["task_name"]:
+                        if rank < 3:
+                            var_object = [0, 0]
+                        elif rank == 3:
+                            var_object = [0.04, 0.15]
+                        elif rank >= 4:
+                            var_object = [0.08, 0.3]
+                        # -0.08 0.08 /// -0.05 0
+                        x = np.linspace(-var_object[0]*2, var_object[0], 4)
+                        # 0.12 0.18 /// 0.12 0.32
+                        y = np.linspace(-var_object[1], var_object[1], 5)
+                        for i in range(20):
+                            eval_player.eval_start(
+                                log_dir, epoch + 1, i +
+                                1, x[int(i / 5)], y[i % 5], rank
+                            )
+                    else:
+                        if "pick_place" in args["task_name"]:
                             var_object = [0, 0] if rank < 4 else [0.05, 0.08]
                             x = np.linspace(
                                 -0.08 - var_object[0], 0.12 + var_object[1], 5
@@ -176,22 +192,7 @@ def train_and_aug(args, demo_files, log_dir, current_rank):
                                 log_dir, epoch + 1, i +
                                 1, x[int(i / 4)], y[i % 4], rank
                             )
-                    elif args["task_name"] == "dclaw":
-                        if rank < 3:
-                            var_object = [0, 0]
-                        elif rank == 3:
-                            var_object = [0.04, 0.15]
-                        elif rank >= 4:
-                            var_object = [0.08, 0.3]
-                        # -0.08 0.08 /// -0.05 0
-                        x = np.linspace(-var_object[0]*2, var_object[0], 4)
-                        # 0.12 0.18 /// 0.12 0.32
-                        y = np.linspace(-var_object[1], var_object[1], 5)
-                        for i in range(20):
-                            eval_player.eval_start(
-                                log_dir, epoch + 1, i +
-                                1, x[int(i / 5)], y[i % 5], rank
-                            )
+                        
 
                 timeout_in_seconds = 90 * args["randomness_rank"]
                 start = time.time()
