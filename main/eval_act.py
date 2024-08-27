@@ -137,10 +137,14 @@ def create_env(args):
         else:
             aug_view_pose = sapien.Pose([0, 0, 0], [1, 0, 0, 0])
         real_camera_cfg = {
-            "relocate_view": dict(
-                pose=aug_view_pose*lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(224, 224)
-            )
-        }
+        "relocate_view": dict(
+            pose=aug_view_pose*lab.ROBOT2BASE * lab.CAM2ROBOT, fov=lab.fov, resolution=(224, 224)
+        ),
+        # "record_view": dict(
+        #     pose=aug_view_pose*lab.ROBOT2BASE * lab.CAM2ROBOT, fov=np.deg2rad(50.4), resolution=(640, 480)
+        # )
+    }
+
 
         env.setup_camera_from_config(real_camera_cfg)
 
@@ -149,6 +153,9 @@ def create_env(args):
         camera_info = {"relocate_view": {
             "rgb": empty_info, "segmentation": empty_info}}
         env.setup_visual_obs_config(camera_info)
+        # camera_info = {"record_view": {
+        # "rgb": empty_info, "segmentation": empty_info}}
+        # env.setup_visual_obs_config(camera_info)
 
     return env
 
@@ -312,6 +319,7 @@ def eval_in_env(
 
     obs = env.get_observation()
     success = False
+    # max_time_step = 1300
     max_time_step = 1100
     action_dim = 22
     all_time_actions = torch.zeros(
@@ -365,7 +373,7 @@ def eval_in_env(
         obs = deepcopy(next_obs)
 
     # only save video if success or in the final_success evaluation
-    # if success or epoch == "best":
+    # if success:
     if "pick_place" in task_name:
         is_lifted = info["is_object_lifted"]
         video_path = os.path.join(
@@ -385,7 +393,7 @@ def eval_in_env(
             f"epoch_{epoch}_{eval_idx}_rank{randomness_rank}_{success}_{total_angle}.mp4",
         )
     # imageio version 2.28.1 imageio-ffmpeg version 0.4.8 scikit-image version 0.20.0
-    imageio.mimsave(video_path, video, fps=120)
+    imageio.mimsave(video_path, video, fps=60)
     avg_success.append(int(success))
 
     return int(success)

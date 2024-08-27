@@ -33,6 +33,8 @@ YCB_CLASSES = {
     20: '052_extra_large_clamp',
     21: '061_foam_brick',
     22: '029_plate',
+    23: '065-f_red_cup',
+    24: '065-h_blue_cup',
 }
 
 YCB_SIZE = {
@@ -48,6 +50,8 @@ YCB_SIZE = {
     "mug": (0.1169, 0.0930, 0.0813),
     "large_clamp": (0.1659, 0.1216, 0.0364),
     "plate" : (0.1169, 0.0930, 0.0813),
+    "red_cup": (0.1169, 0.0930, 0.0813),
+    "blue_cup": (0.1169, 0.0930, 0.0813)
 }
 
 YCB_ORIENTATION = {
@@ -62,7 +66,9 @@ YCB_ORIENTATION = {
     "bowl": (1, 0, 0, 0),
     "mug": (1, 0, 0, 0),
     "large_clamp": (0, 0, 0, 1),
-    "plate": (1, 0, 0, 0)
+    "plate": (1, 0, 0, 0),
+    "red_cup": (1, 0, 0, 0),
+    "blue_cup": (1, 0, 0, 0)
 }
 
 INVERSE_YCB_CLASSES = {"_".join(value.split("_")[1:]): key for key, value in YCB_CLASSES.items()}

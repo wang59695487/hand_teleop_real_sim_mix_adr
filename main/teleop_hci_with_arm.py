@@ -11,6 +11,7 @@ from hand_teleop.env.sim_env.table_door_env import TableDoorEnv
 from hand_teleop.env.sim_env.pick_place_env import PickPlaceEnv
 from hand_teleop.env.sim_env.dclaw_env import DClawEnv
 from hand_teleop.env.sim_env.pour_env import PourBoxEnv
+from hand_teleop.env.sim_env.cup_stack_env import CupStackEnv
 from hand_teleop.env.sim_env.laptop_env import LaptopEnv
 from hand_teleop.env.sim_env.insert_object_env import InsertObjectEnv
 from hand_teleop.env.sim_env.hammer_env import HammerEnv
@@ -35,8 +36,8 @@ def main():
     # robot_name = "xarm6_allegro_wrist_mounted_rotate"
     demo_index = 0
 
-    task_name = "pour"
-    if task_name == "dclaw":
+    task_name = "cupstack"
+    if task_name in ["dclaw","cupstack"]:
         frame_skip = 10
     elif task_name in ["pick_place", "pour", "reorientation"]:
         frame_skip = 5
@@ -50,12 +51,13 @@ def main():
         "potted_meat_can",
         "sugar_box",
         "chip_can",
+        "red_cup",
     ]
     if args.object is not None:
         object_name = args.object
         assert object_name in object_names
     else:
-        object_name = object_names[-4]
+        object_name = object_names[-1]
     operator = "test"
     hand_mode = "right_hand"
     object_scale = 1
@@ -102,6 +104,24 @@ def main():
         env_dict = dict(task_name=task_name)
     elif task_name == "pick_place":
         env = PickPlaceEnv(
+            object_name=object_name,
+            object_seed=demo_name,
+            frame_skip=frame_skip,
+            object_scale=object_scale,
+            randomness_scale=randomness_scale,
+        )
+        env.reset_env()
+        env_dict = dict(
+            task_name=task_name,
+            object_name=object_name,
+            object_scale=object_scale,
+            randomness_scale=randomness_scale,
+            init_obj_pos=env.init_pose,
+            init_target_pos=env.target_pose,
+        )
+        demo_name = "{}_{}".format(object_name, demo_name)
+    elif task_name == "cupstack":
+        env = CupStackEnv(
             object_name=object_name,
             object_seed=demo_name,
             frame_skip=frame_skip,
