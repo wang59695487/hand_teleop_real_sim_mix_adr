@@ -221,10 +221,53 @@ def generate_feature_extraction_model(backbone_type):
 
         model = FeatureExtractor(backbone)
 
-    preprocess = transforms.Compose([
-        transforms.Resize((224, 224)),  # resize to 224*224
-        transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-    ])
+    elif "MoCo" in backbone_type:
+        if backbone_type == "MoCo18":
+            backbone = models.resnet18()
+            checkpoint = torch.load('trained_models/mocov2_r18_imgnet_e100.pt')
+        elif backbone_type == "MoCo50":
+            backbone = models.resnet50()
+            checkpoint = torch.load('trained_models/moco_v2_800ep_pretrain.pt')
+        state_dict = checkpoint['state_dict']
+        for k in list(state_dict.keys()):
+            # retain only encoder_q up to before the embedding layer
+            if k.startswith('module.encoder_q') and not k.startswith('module.encoder_q.fc'):
+                # remove prefix
+                state_dict[k[len("module.encoder_q."):]] = state_dict[k]
+            # delete renamed or unused k
+            del state_dict[k]
+        msg = backbone.load_state_dict(state_dict, strict=False)
+        assert set(msg.missing_keys) == {"fc.weight", "fc.bias"}
+
+        model = FeatureExtractor(backbone)
+    elif "vit" in backbone_type:
+        model = eval(f"models.{backbone_type}")(weights="IMAGENET1K_V1")
+        model = nn.Sequential(
+            create_feature_extractor(model, {"encoder": "img_feats"}),
+            ClassToken(0)
+        )
+    elif "clip" in backbone_type:
+        model, preprocess = clip.load(
+            backbone_type.replace("clip_", ""), device=device)
+        model = model.visual.float()
+        preprocess = transforms.Compose([
+            # preprocess.transforms[0],
+            # preprocess.transforms[1],
+            preprocess.transforms[4],
+        ])
+    else:
+        model = eval(f"models.{backbone_type}")(weights="IMAGENET1K_V1")
+        model = nn.Sequential(
+            create_feature_extractor(model, {"avgpool": "img_feats"}),
+            ClassToken("img_feats")
+        )
+
+    if "clip" not in backbone_type:
+
+        preprocess = transforms.Compose([
+            transforms.Resize((224, 224)),  # resize to 224*224
+            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+        ])
 
     return model, preprocess
 
