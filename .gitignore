@@ -177,3 +177,5 @@ real_sim_mix/
 temp/
 .history/
 imgui.ini
+.README2.md
+.Real_Sim_Mix.md

@@ -1,5 +1,11 @@
 import setuptools
 
+# Function to read requirements from a file
+def read_requirements(filename):
+    with open(filename) as f:
+        # Filter out comments and empty lines
+        return [line.strip() for line in f if line and not line.startswith('#')]
+
 with open("README.md", "r") as fh:
 
     long_description = fh.read()
@@ -35,5 +41,5 @@ setuptools.setup(
     ],
 
     python_requires='>=3.6',
-
+    install_requires=read_requirements('requirements.txt'), 
 )

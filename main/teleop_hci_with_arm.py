@@ -31,12 +31,12 @@ from hand_teleop.teleop.teleop_client import TeleopClient
 def main():
     parser = ArgumentParser()
     parser.add_argument("--object", default=None, type=str)
+    parser.add_argument("--task", default="pick_place", type=str)
+    parser.add_argument("--out-folder", default="./sim/raw_data", type=str)
     args = parser.parse_args()
     robot_name = "xarm6_allegro_modified_finger"
     # robot_name = "xarm6_allegro_wrist_mounted_rotate"
-    demo_index = 0
-
-    task_name = "cupstack"
+    task_name = args.task
     if task_name in ["dclaw","cupstack"]:
         frame_skip = 10
     elif task_name in ["pick_place", "pour", "reorientation"]:
@@ -53,6 +53,7 @@ def main():
         "chip_can",
         "red_cup",
     ]
+    demo_index = 0
     if args.object is not None:
         object_name = args.object
         assert object_name in object_names
@@ -66,7 +67,7 @@ def main():
     folder_name = task_name
     if task_name == "relocate" or task_name == "pick_place":
         folder_name = "{}_{}".format(folder_name, object_name)
-    out_folder = f"./sim/raw_data/{folder_name}/"
+    out_folder = f"{args.out_folder}/{folder_name}/"
     os.makedirs(out_folder, exist_ok=True)
     if len(os.listdir(out_folder)) == 0:
         num_test = "0001"
