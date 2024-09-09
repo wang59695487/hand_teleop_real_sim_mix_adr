@@ -1,7 +1,7 @@
 # CyberDemo: Augmenting Simulated Human Demonstration for Real-World Dexterous Manipulation
 
 <p align="center">
-  <img src="docs/cyberdemo.avif" width="1000"/>
+  <img src="docs/cyberdemo.gif" width="1000"/>
 </p>
 
 This repository contains a reference PyTorch implementation of the paper:
