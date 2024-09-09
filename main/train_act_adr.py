@@ -306,7 +306,7 @@ def parse_args():
     parser.add_argument("--dann", action="store_true")
     parser.add_argument("--domain_weight", default=20, type=float)
     parser.add_argument("--is-feature", default=False, type=bool)
-
+    parser.add_argument("--sensitivity-check", default=False, type=bool)
     args = parser.parse_args()
 
     return args
@@ -346,6 +346,7 @@ if __name__ == "__main__":
         "task_name": args.task_name,
         "object_name": args.object_name,
         "is_feature": args.is_feature,
+        "sensitivity_check": args.sensitivity_check,
         "seed": 20230930,
     }
     args = argument_dependecy_checker(args)

@@ -529,90 +529,90 @@ def play_one_real_sim_visual_demo(
                         break
 
         chunk_sensitivity = []
-        # if info_success and task_name in ["pick_place", "pour"]:
-        #     # assign weights for action chunk
-        #     total_frame = len(visual_baked["obs"])
-        #     for i in tqdm(range(total_frame // 50)):
-        #         for var in [1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0]:
-        #             valid_frame = 0
-        #             env.reset()
-        #             for idx in range(0, len(baked_data["obs"]), frame_skip):
-        #                 # NOTE: robot.get_qpos() version
-        #                 if idx < len(baked_data["obs"]) - frame_skip:
-        #                     ee_pose_next = baked_data["ee_pose"][idx + frame_skip]
-        #                     ee_pose_delta = np.sqrt(
-        #                         np.sum((ee_pose_next[:3] - ee_pose[:3]) ** 2)
-        #                     )
-        #                     hand_qpos = baked_data["action"][idx][env.arm_dof:]
-        #                     delta_hand_qpos = (
-        #                         hand_qpos - hand_qpos_prev if idx != 0 else hand_qpos
-        #                     )
+        if info_success and task_name in ["pick_place", "pour"] and args["sensitivity_check"]:
+            # assign weights for action chunk
+            total_frame = len(visual_baked["obs"])
+            for i in tqdm(range(total_frame // 50)):
+                for var in [1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0]:
+                    valid_frame = 0
+                    env.reset()
+                    for idx in range(0, len(baked_data["obs"]), frame_skip):
+                        # NOTE: robot.get_qpos() version
+                        if idx < len(baked_data["obs"]) - frame_skip:
+                            ee_pose_next = baked_data["ee_pose"][idx + frame_skip]
+                            ee_pose_delta = np.sqrt(
+                                np.sum((ee_pose_next[:3] - ee_pose[:3]) ** 2)
+                            )
+                            hand_qpos = baked_data["action"][idx][env.arm_dof:]
+                            delta_hand_qpos = (
+                                hand_qpos - hand_qpos_prev if idx != 0 else hand_qpos
+                            )
 
-        #                     if (
-        #                         ee_pose_delta < 0.001
-        #                         and np.mean(handqpos2angle(delta_hand_qpos)) <= 1.2
-        #                         and task_name in ["pick_place", "dclaw"]
-        #                     ):
-        #                         continue
-        #                     else:
-        #                         valid_frame += 1
-        #                         ee_pose = ee_pose_next
-        #                         hand_qpos_prev = hand_qpos
+                            if (
+                                ee_pose_delta < 0.001
+                                and np.mean(handqpos2angle(delta_hand_qpos)) <= 1.2
+                                and task_name in ["pick_place", "dclaw"]
+                            ):
+                                continue
+                            else:
+                                valid_frame += 1
+                                ee_pose = ee_pose_next
+                                hand_qpos_prev = hand_qpos
 
-        #                         palm_pose = env.ee_link.get_pose()
-        #                         palm_pose = robot_pose.inv() * palm_pose
+                                palm_pose = env.ee_link.get_pose()
+                                palm_pose = robot_pose.inv() * palm_pose
 
-        #                         palm_next_pose = sapien.Pose(
-        #                             ee_pose_next[0:3], ee_pose_next[3:7]
-        #                         )
-        #                         palm_next_pose = robot_pose.inv() * palm_next_pose
+                                palm_next_pose = sapien.Pose(
+                                    ee_pose_next[0:3], ee_pose_next[3:7]
+                                )
+                                palm_next_pose = robot_pose.inv() * palm_next_pose
 
-        #                         palm_delta_pose = palm_pose.inv() * palm_next_pose
-        #                         (
-        #                             delta_axis,
-        #                             delta_angle,
-        #                         ) = transforms3d.quaternions.quat2axangle(
-        #                             palm_delta_pose.q
-        #                         )
-        #                         if delta_angle > np.pi:
-        #                             delta_angle = 2 * np.pi - delta_angle
-        #                             delta_axis = -delta_axis
-        #                         delta_axis_world = (
-        #                             palm_pose.to_transformation_matrix()[
-        #                                 :3, :3]
-        #                             @ delta_axis
-        #                         )
-        #                         delta_pose = np.concatenate(
-        #                             [
-        #                                 palm_next_pose.p - palm_pose.p,
-        #                                 delta_axis_world * delta_angle,
-        #                             ]
-        #                         )
-        #                         ############################## Action Chunk Test#################################
-        #                         if valid_frame > i * 50 and valid_frame <= (i + 1) * 50:
-        #                             delta_pose = delta_pose * var
-        #                             delta_hand_qpos = delta_hand_qpos * var
-        #                             hand_qpos = hand_qpos_prev + delta_hand_qpos
+                                palm_delta_pose = palm_pose.inv() * palm_next_pose
+                                (
+                                    delta_axis,
+                                    delta_angle,
+                                ) = transforms3d.quaternions.quat2axangle(
+                                    palm_delta_pose.q
+                                )
+                                if delta_angle > np.pi:
+                                    delta_angle = 2 * np.pi - delta_angle
+                                    delta_axis = -delta_axis
+                                delta_axis_world = (
+                                    palm_pose.to_transformation_matrix()[
+                                        :3, :3]
+                                    @ delta_axis
+                                )
+                                delta_pose = np.concatenate(
+                                    [
+                                        palm_next_pose.p - palm_pose.p,
+                                        delta_axis_world * delta_angle,
+                                    ]
+                                )
+                                ############################## Action Chunk Test#################################
+                                if valid_frame > i * 50 and valid_frame <= (i + 1) * 50:
+                                    delta_pose = delta_pose * var
+                                    delta_hand_qpos = delta_hand_qpos * var
+                                    hand_qpos = hand_qpos_prev + delta_hand_qpos
 
-        #                         palm_jacobian = env.kinematic_model.compute_end_link_spatial_jacobian(
-        #                             env.robot.get_qpos()[: env.arm_dof]
-        #                         )
-        #                         arm_qvel = compute_inverse_kinematics(
-        #                             delta_pose, palm_jacobian
-        #                         )[: env.arm_dof]
-        #                         arm_qpos = (
-        #                             arm_qvel +
-        #                             env.robot.get_qpos()[: env.arm_dof]
-        #                         )
+                                palm_jacobian = env.kinematic_model.compute_end_link_spatial_jacobian(
+                                    env.robot.get_qpos()[: env.arm_dof]
+                                )
+                                arm_qvel = compute_inverse_kinematics(
+                                    delta_pose, palm_jacobian
+                                )[: env.arm_dof]
+                                arm_qpos = (
+                                    arm_qvel +
+                                    env.robot.get_qpos()[: env.arm_dof]
+                                )
 
-        #                         target_qpos = np.concatenate(
-        #                             [arm_qpos, hand_qpos])
+                                target_qpos = np.concatenate(
+                                    [arm_qpos, hand_qpos])
 
-        #                         _, _, _, info = env.step(target_qpos)
+                                _, _, _, info = env.step(target_qpos)
 
-        #             if not info["success"] or var == 2.0:
-        #                 chunk_sensitivity.append(var)
-        #                 break
+                    if not info["success"] or var == 2.0:
+                        chunk_sensitivity.append(var)
+                        break
 
         return visual_baked, meta_data, info_success, lifted_chunk, chunk_sensitivity
 
@@ -760,6 +760,7 @@ def parse_args():
     parser.add_argument("--object-name", default="mustard_bottle")
     parser.add_argument("--out-folder", required=True)
     parser.add_argument("--with-features", default=False)
+    parser.add_argument("--sensitivity-check", default=False, type=bool)
     parser.add_argument("--seed", default=20230929, type=int)
     args = parser.parse_args()
 
@@ -790,6 +791,7 @@ if __name__ == "__main__":
         "frame_skip": args.frame_skip,
         "chunk_size": args.chunk_size,
         "out_folder": args.out_folder,
+        "sensitivity_check": args.sensitivity_check,
         "seed": args.seed,
     }
 

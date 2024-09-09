@@ -20,20 +20,20 @@ from hand_teleop.real_world import lab
 from hand_teleop.player.player import *
 
 
-# def aug_in_non_sensitive_chunk(lifted_chunk, chunk_sensitivity):
-#     aug_step_obj_length = 3  # hyperparameter
-#     aug_step_target_length = 3  # hyperparameter
-#     aug_obj_chunk = []
-#     aug_target_chunk = []
-#     chunk_sensitivity_obj = np.argsort(
-#         -np.array(chunk_sensitivity[:lifted_chunk]))
-#     aug_obj_chunk = chunk_sensitivity_obj[:aug_step_obj_length] if aug_step_obj_length <= lifted_chunk else chunk_sensitivity_obj
-#     chunk_sensitivity_target = np.argsort(
-#         -np.array(chunk_sensitivity[lifted_chunk:len(chunk_sensitivity)]))
-#     aug_target_chunk = chunk_sensitivity_target[:aug_step_target_length] if aug_step_target_length <= len(
-#         chunk_sensitivity)-lifted_chunk else chunk_sensitivity_target
+def aug_in_non_sensitive_chunk(lifted_chunk, chunk_sensitivity):
+    aug_step_obj_length = 3  # hyperparameter
+    aug_step_target_length = 3  # hyperparameter
+    aug_obj_chunk = []
+    aug_target_chunk = []
+    chunk_sensitivity_obj = np.argsort(
+        -np.array(chunk_sensitivity[:lifted_chunk]))
+    aug_obj_chunk = chunk_sensitivity_obj[:aug_step_obj_length] if aug_step_obj_length <= lifted_chunk else chunk_sensitivity_obj
+    chunk_sensitivity_target = np.argsort(
+        -np.array(chunk_sensitivity[lifted_chunk:len(chunk_sensitivity)]))
+    aug_target_chunk = chunk_sensitivity_target[:aug_step_target_length] if aug_step_target_length <= len(
+        chunk_sensitivity)-lifted_chunk else chunk_sensitivity_target
 
-#     return aug_obj_chunk, aug_target_chunk
+    return aug_obj_chunk, aug_target_chunk
 
 
 def create_env(args, demo, retarget=False):
@@ -210,19 +210,20 @@ def generate_sim_aug_in_play_demo(args, demo, demo_idx, init_pose_aug_target, in
 
     ################################# Kinematic Augmentation####################################
     if task_name in ["pick_place", 'pour']:
-        # sensitive_chunk_file = f"{args['sim_dataset_folder']}/meta_data.pickle"
-        # with open(sensitive_chunk_file, 'rb') as file:
-        #     sensitive_chunk_data = pickle.load(file)
-        # aug_obj_chunk, aug_target_chunk = aug_in_non_sensitive_chunk(sensitive_chunk_data['lifted_chunks'][demo_idx],
-        #                                                              chunk_sensitivity=sensitive_chunk_data['chunks_sensitivity'][demo_idx])
-        # aug_step_obj = len(aug_obj_chunk)*50
-        # aug_step_target = len(aug_target_chunk)*50
-        # meta_data["env_kwargs"]['init_target_pos'] = init_pose_aug_target * \
-        #     meta_data["env_kwargs"]['init_target_pos']
-        # env.target_object.set_pose(meta_data["env_kwargs"]['init_target_pos'])
-        # aug_target = np.array([init_pose_aug_obj.p[0], init_pose_aug_obj.p[1]])
-        # one_step_aug_target = np.array([(-1*init_pose_aug_obj.p[0]+init_pose_aug_target.p[0]) /
-        #                                 aug_step_target, (-1*init_pose_aug_obj.p[1]+init_pose_aug_target.p[1])/aug_step_target])
+        if args["sensitivity_check"]:
+            sensitive_chunk_file = f"{args['sim_dataset_folder']}/meta_data.pickle"
+            with open(sensitive_chunk_file, 'rb') as file:
+                sensitive_chunk_data = pickle.load(file)
+            aug_obj_chunk, aug_target_chunk = aug_in_non_sensitive_chunk(sensitive_chunk_data['lifted_chunks'][demo_idx],
+                                                                        chunk_sensitivity=sensitive_chunk_data['chunks_sensitivity'][demo_idx])
+            aug_step_obj = len(aug_obj_chunk)*50
+            aug_step_target = len(aug_target_chunk)*50
+            meta_data["env_kwargs"]['init_target_pos'] = init_pose_aug_target * \
+                meta_data["env_kwargs"]['init_target_pos']
+            env.target_object.set_pose(meta_data["env_kwargs"]['init_target_pos'])
+            aug_target = np.array([init_pose_aug_obj.p[0], init_pose_aug_obj.p[1]])
+            one_step_aug_target = np.array([(-1*init_pose_aug_obj.p[0]+init_pose_aug_target.p[0]) /
+                                            aug_step_target, (-1*init_pose_aug_obj.p[1]+init_pose_aug_target.p[1])/aug_step_target])
         aug_step_obj = 150
         aug_step_target = 200
         meta_data["env_kwargs"]['init_target_pos'] = init_pose_aug_target * \
@@ -430,9 +431,8 @@ def player_augmenting(args):
         for demo_id, file_name in enumerate(demo_files):
             random.seed()
             demo_idx = file_name.split("/")[-1].split(".")[0]
-            num_test = 0
-            # if demo_id <= 5:
-            #     continue
+            num_success = 0
+          
             with open(file_name, 'rb') as file:
                 demo = pickle.load(file)
 
@@ -458,21 +458,21 @@ def player_augmenting(args):
             init_pose_aug_target = sapien.Pose([0, 0, 0], [1, 0, 0, 0])
 
             info_success, video = generate_sim_aug_in_play_demo(
-                args, all_data, demo_idx, init_pose_aug_target, init_pose_aug_obj, var_adr_light=3, is_video=True)
-            # imageio.mimsave(
-            #     f"./temp/demos/aug_{args['object_name']}/demo_{demo_id+1}_{num_test}_x1{x1:.2f}_y1{y1:.2f}_x2{x2:.2f}_y2{y2:.2f}.mp4", video, fps=120)
-            # print(info_success)
+                args, all_data, demo_idx, init_pose_aug_target, init_pose_aug_obj, var_adr_light=3, is_video=args['save_video'])
+            if args['save_video']:
+                os.makedirs(f"./temp/demos/aug_{args['object_name']}/", exist_ok=True)
+                imageio.mimsave(
+                    f"./temp/demos/aug_{args['object_name']}/demo_{demo_id+1}_{info_success}_{num_success}_x1{x1:.2f}_y1{y1:.2f}_x2{x2:.2f}_y2{y2:.2f}.mp4", video, fps=120)
+            print(info_success)
             if info_success:
-
                 print("##############SUCCESS##############")
-                num_test += 1
+                num_success += 1
                 print("##########This is {}th try and {}th success##########".format(
-                    i+1, num_test))
+                    i+1, num_success))
+                    # imageio.mimsave(
+                    #     f"./temp/demos/aug_{args['object_name']}/demo_{demo_id+1}_{num_success}_x1{x1:.2f}_y1{y1:.2f}_x2{x2:.2f}_y2{y2:.2f}.mp4", video, fps=120)
 
-                # imageio.mimsave(
-                #     f"./temp/demos/aug_{args['object_name']}/demo_{demo_id+1}_{num_test}_x1{x1:.2f}_y1{y1:.2f}_x2{x2:.2f}_y2{y2:.2f}.mp4", video, fps=120)
-
-            if num_test == args['kinematic_aug']:
+            if num_success == args['kinematic_aug']:
                 break
 
 
@@ -488,6 +488,8 @@ def parse_args():
     parser.add_argument("--retarget", default=False, type=bool)
     parser.add_argument("--delta-ee-pose-bound", default=0, type=float)
     parser.add_argument("--randomness-rank", default=1, type=int)
+    parser.add_argument("--save-video", default=False, type=bool)
+    parser.add_argument("--sensitivity-check", default=False, type=bool)
 
     args = parser.parse_args()
 
@@ -500,16 +502,18 @@ if __name__ == '__main__':
 
     args = {
         'seed': args.seed,
-        'sim_dataset_folder': args.sim_dataset_folder,
         'sim_demo_folder': args.sim_demo_folder,
+        'sim_dataset_folder': args.sim_dataset_folder,
         'task_name': args.task_name,
         'object_name': args.object_name,
         'kinematic_aug': args.kinematic_aug,
         'frame_skip': args.frame_skip,
         'delta_ee_pose_bound': args.delta_ee_pose_bound,
-        "randomness_rank": args.randomness_rank,
+        'randomness_rank': args.randomness_rank,
         'retarget': args.retarget,
-        "robot_name": "xarm6_allegro_modified_finger",
+        'robot_name': "xarm6_allegro_modified_finger",
+        'save_video': args.save_video,
+        'sensitivity_check': args.sensitivity_check,
     }
 
     player_augmenting(args)

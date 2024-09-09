@@ -79,6 +79,7 @@ def get_args_parser():
     parser.add_argument("--is-feature", default=False, type=bool)
     parser.add_argument("--domain_weight", default=20, type=float)
     parser.add_argument("--object-name", default="mustard_bottle", type=str)
+    parser.add_argument("--sensitivity-check", default=False, type=bool)
 
     return parser
 
