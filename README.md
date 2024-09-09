@@ -14,8 +14,9 @@ This repository contains a reference PyTorch implementation of the paper:
 [Akhilan Gurumoorthy](https://www.linkedin.com/in/akhilan-g/),
 [Hao Su](https://cseweb.ucsd.edu/~haosu/index.html),
 [Xiaolong Wang](https://xiaolonw.github.io/) <br>
-[[Website](https://cyber-demo.github.io/)]
 [[Paper](https://arxiv.org/pdf/2402.14795)]
+
+For more real world demos, please refer to [[Website](https://cyber-demo.github.io/)]
 
 ## Installation
 
