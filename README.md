@@ -216,3 +216,7 @@ python main/train_act.py \
         year={2024}
       }
 ```
+
+## Acknowledgements
+We gratefully acknowledge support from the Technology Innovation Program (20018112, Development of autonomous manipulation and
+gripping technology using imitation learning based on visual and tactile sensing) funded by the Ministry of Trade, Industry & Energy (MOTIE), Korea.
